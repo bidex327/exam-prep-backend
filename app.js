@@ -1,10 +1,11 @@
 import express from "express";
+import connectDb from "./src/config/db.js";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const app = express();
-
+connectDb();
 app.use(express.json());
 
 app.get("/", (req, res) => {
