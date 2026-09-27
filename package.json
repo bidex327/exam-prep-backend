@@ -23,5 +23,13 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bidex327/exam-prep-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bidex327/exam-prep-backend/issues"
+  },
+  "homepage": "https://github.com/bidex327/exam-prep-backend#readme"
 }
