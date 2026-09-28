@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import connectDb from "./src/config/db.js";
 import dotenv from "dotenv";
+import questionRoutes from "./src/routes/questionRoutes.js";
 
 dotenv.config();
 
@@ -11,6 +12,8 @@ connectDb();
 
 app.use(cors());
 app.use(express.json());
+// Question Bank API routes
+app.use("/api/questions", questionRoutes);
 
 app.get("/", (req, res) => {
   res.send("Welcome to my API");
