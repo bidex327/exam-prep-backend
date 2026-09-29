@@ -14,6 +14,7 @@
   "type": "module",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^18.0.4",
     "express": "^5.2.1",
@@ -23,5 +24,13 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bidex327/exam-prep-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bidex327/exam-prep-backend/issues"
+  },
+  "homepage": "https://github.com/bidex327/exam-prep-backend#readme"
 }
