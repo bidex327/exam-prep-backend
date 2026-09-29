@@ -12,6 +12,9 @@ connectDb();
 app.use(cors());
 app.use(express.json());
 
+import authRoute from "./src/routes/authRoute.js";
+app.use("/api/auth", authRoute);
+
 app.get("/", (req, res) => {
   res.send("Welcome to my API");
 });
