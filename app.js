@@ -12,6 +12,11 @@ connectDb();
 
 app.use(cors());
 app.use(express.json());
+// Question Bank API routes
+app.use("/api/questions", questionRoutes);
+
+import authRoute from "./src/routes/authRoute.js";
+app.use("/api/auth", authRoute);
 
 // Question Bank API routes
 app.use("/api/questions", questionRoutes);
