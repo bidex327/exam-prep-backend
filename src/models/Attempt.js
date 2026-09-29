@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 // FOR THE ATTEMPT SCHEMA.
-export const attemptSchema = new mongoose.Schema({
+const attemptSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
