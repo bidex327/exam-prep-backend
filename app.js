@@ -18,6 +18,9 @@ app.use("/api/questions", questionRoutes);
 import authRoute from "./src/routes/authRoute.js";
 app.use("/api/auth", authRoute);
 
+// Question Bank API routes
+app.use("/api/questions", questionRoutes);
+
 app.get("/", (req, res) => {
   res.send("Welcome to my API");
 });

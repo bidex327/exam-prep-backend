@@ -1,32 +1,77 @@
+import mongoose from "mongoose";
 import Question from "../models/Question.js";
 
-// Get all questions, with optional filters
+
+
+
 export const getQuestions = async (req, res) => {
   try {
-    // Get filter values from the URL query
-    // Example: /api/questions?subjectId=123&year=2023
+
     const { examId, subjectId, topicId, year } = req.query;
 
-    // Start with an empty filter
+    // Start with an empty filter object.
     const filter = {};
 
-    // Add a filter only when the value is provided
-    if (examId) filter.examId = examId;
-    if (subjectId) filter.subjectId = subjectId;
-    if (topicId) filter.topicId = topicId;
-    if (year) filter.year = year;
+    // Filter by examId
+    if (examId) {
+      if (!mongoose.isValidObjectId(examId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid examId",
+          data: {}
+        });
+      }
+      filter.examId = examId;
+    }
 
-    // Find questions that match the filter
+    // Filter by subjectId
+    if (subjectId) {
+      if (!mongoose.isValidObjectId(subjectId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid subjectId",
+          data: {}
+        });
+      }
+      filter.subjectId = subjectId;
+    }
+
+    // Filter by topicId
+    if (topicId) {
+      if (!mongoose.isValidObjectId(topicId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid topicId",
+          data: {}
+        });
+      }
+      filter.topicId = topicId;
+    }
+
+    // Filter by year
+    if (year) {
+      const numericYear = Number(year);
+      if (!Number.isInteger(numericYear)) {
+        return res.status(400).json({
+          success: false,
+          message: "Year must be a valid number",
+          data: {}
+        });
+      }
+      filter.year = numericYear;
+    }
+
+    // Find questions using all supplied filters
     const questions = await Question.find(filter);
 
-    // Send the questions back to the client
     return res.status(200).json({
       success: true,
       message: "Questions fetched successfully",
       data: questions
     });
+
   } catch (error) {
-    // Handle database/server errors
+    console.error("Error fetching questions:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch questions",
@@ -36,17 +81,24 @@ export const getQuestions = async (req, res) => {
 };
 
 
-// Get one question using its MongoDB ID
+// ======================================================
+// GET ONE QUESTION BY ID
+// ======================================================
+
 export const getQuestionById = async (req, res) => {
   try {
-    // Get the ID from the URL
-    // Example: /api/questions/65abc123
     const { id } = req.params;
 
-    // Search MongoDB for the question
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid question ID",
+        data: {}
+      });
+    }
+
     const question = await Question.findById(id);
 
-    // If the question doesn't exist
     if (!question) {
       return res.status(404).json({
         success: false,
@@ -55,14 +107,14 @@ export const getQuestionById = async (req, res) => {
       });
     }
 
-    // Return the question
     return res.status(200).json({
       success: true,
       message: "Question fetched successfully",
       data: question
     });
+
   } catch (error) {
-    // Handle database/server errors
+    console.error("Error fetching question:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch question",
@@ -72,10 +124,12 @@ export const getQuestionById = async (req, res) => {
 };
 
 
-// Create a new question
+// ======================================================
+// CREATE A NEW QUESTION
+// ======================================================
+
 export const createQuestion = async (req, res) => {
   try {
-    // Get question data from the request body
     const {
       examId,
       subjectId,
@@ -86,7 +140,6 @@ export const createQuestion = async (req, res) => {
       explanation
     } = req.body;
 
-    // Create and save the question in MongoDB
     const question = await Question.create({
       examId,
       subjectId,
@@ -97,14 +150,14 @@ export const createQuestion = async (req, res) => {
       explanation
     });
 
-    // Return the newly created question
     return res.status(201).json({
       success: true,
       message: "Question created successfully",
       data: question
     });
+
   } catch (error) {
-    // Handle validation/database errors
+    console.error("Error creating question:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to create question",
@@ -114,14 +167,22 @@ export const createQuestion = async (req, res) => {
 };
 
 
-// Update an existing question
+// ======================================================
+// UPDATE AN EXISTING QUESTION
+// ======================================================
+
 export const updateQuestion = async (req, res) => {
   try {
-    // Get the question ID from the URL
-    // Example: PUT /api/questions/65abc123
     const { id } = req.params;
 
-    // Get updated information from the request body
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid question ID",
+        data: {}
+      });
+    }
+
     const {
       examId,
       subjectId,
@@ -132,7 +193,6 @@ export const updateQuestion = async (req, res) => {
       explanation
     } = req.body;
 
-    // Find the question by ID and update it
     const question = await Question.findByIdAndUpdate(
       id,
       {
@@ -150,7 +210,6 @@ export const updateQuestion = async (req, res) => {
       }
     );
 
-    // If the question doesn't exist
     if (!question) {
       return res.status(404).json({
         success: false,
@@ -159,14 +218,14 @@ export const updateQuestion = async (req, res) => {
       });
     }
 
-    // Return the updated question
     return res.status(200).json({
       success: true,
       message: "Question updated successfully",
       data: question
     });
+
   } catch (error) {
-    // Handle validation/database errors
+    console.error("Error updating question:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to update question",
@@ -176,17 +235,24 @@ export const updateQuestion = async (req, res) => {
 };
 
 
-// Delete an existing question
+// ======================================================
+// DELETE AN EXISTING QUESTION
+// ======================================================
+
 export const deleteQuestion = async (req, res) => {
   try {
-    // Get the question ID from the URL
-    // Example: DELETE /api/questions/65abc123
     const { id } = req.params;
 
-    // Find the question by ID and delete it
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid question ID",
+        data: {}
+      });
+    }
+
     const question = await Question.findByIdAndDelete(id);
 
-    // If the question doesn't exist
     if (!question) {
       return res.status(404).json({
         success: false,
@@ -195,14 +261,14 @@ export const deleteQuestion = async (req, res) => {
       });
     }
 
-    // Return the deleted question as confirmation
     return res.status(200).json({
       success: true,
       message: "Question deleted successfully",
       data: question
     });
+
   } catch (error) {
-    // Handle database/server errors
+    console.error("Error deleting question:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to delete question",
