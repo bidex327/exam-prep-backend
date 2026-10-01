@@ -1,8 +1,11 @@
 import express from "express";
 import cors from "cors";
-import connectDb from "./src/config/db.js";
 import dotenv from "dotenv";
+
+import connectDb from "./src/config/db.js";
 import questionRoutes from "./src/routes/questionRoutes.js";
+import dashboardRoute from "./src/routes/dashboardRoute.js";
+import authRoute from "./src/routes/authRoute.js";
 
 dotenv.config();
 
@@ -12,14 +15,11 @@ connectDb();
 
 app.use(cors());
 app.use(express.json());
-// Question Bank API routes
-app.use("/api/questions", questionRoutes);
 
-import authRoute from "./src/routes/authRoute.js";
+// API routes
+app.use("/api/questions", questionRoutes);
+app.use("/api/dashboard", dashboardRoute);
 app.use("/api/auth", authRoute);
-
-// Question Bank API routes
-app.use("/api/questions", questionRoutes);
 
 app.get("/", (req, res) => {
   res.send("Welcome to my API");
