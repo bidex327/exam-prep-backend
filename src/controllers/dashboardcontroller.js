@@ -1,6 +1,6 @@
 import User from "../models/User.js";
 
-export const getdashboard = async (req, res) => {
+export const getDashboard = async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
       .populate("targetExam")
@@ -23,7 +23,6 @@ export const getdashboard = async (req, res) => {
         selectedSubjects: user.selectedSubjects,
         questionsAttempted: user.questionsAttempted,
         studyStreak: user.studyStreak,
-
         progressPercentage: null,
         currentSubject: null,
         currentTopic: null,
@@ -31,9 +30,12 @@ export const getdashboard = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error("Dashboard error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to fetch dashboard",
+      error: error.message,
       data: {}
     });
   }
