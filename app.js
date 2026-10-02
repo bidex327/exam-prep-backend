@@ -1,12 +1,14 @@
 import express from "express";
 import cors from "cors";
-import connectDb from "./src/config/db.js";
 import dotenv from "dotenv";
 
-// Question Bank routes
-import questionRoutes from "./src/routes/questionRoutes.js";
+import connectDb from "./src/config/db.js";
+import "./src/models/Subject.js";
 
-// Foundation model routes
+import questionRoutes from "./src/routes/questionRoutes.js";
+import dashboardRoute from "./src/routes/dashboardRoute.js";
+import authRoute from "./src/routes/authRoute.js";
+
 import examRoutes from "./src/routes/examRoutes.js";
 import subjectRoutes from "./src/routes/subjectRoutes.js";
 import topicRoutes from "./src/routes/topicRoutes.js";
@@ -18,19 +20,32 @@ const app = express();
 // Connect to MongoDB
 connectDb();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-// Question Bank API routes
-app.use("/api/questions", questionRoutes);
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  "http://localhost:5500",
+];
 
-import authRoute from "./src/routes/authRoute.js";
+export const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+app.use(express.json());
+
+// API routes
+app.use("/api/questions", questionRoutes);
+app.use("/api/dashboard", dashboardRoute);
 app.use("/api/auth", authRoute);
 
-// Question Bank API routes
-app.use("/api/questions", questionRoutes);
-
-// Exam, Subject and Topic API routes
 app.use("/api/exams", examRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/topics", topicRoutes);
