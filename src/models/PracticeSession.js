@@ -1,38 +1,69 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const practiceSessionSchema = new mongoose.Schema(
   {
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: true,
       index: true,
     },
 
     topicId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Topic',
+      ref: "Topic",
       required: true,
       index: true,
     },
 
-    numberOfQuestions: { type: Number, required: true, min: 1 },
+    numberOfQuestions: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
 
-    score: { type: Number, required: true, min: 0 },
+    score: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
 
-    accuracy: { type: Number, default: 0, min: 0, max: 100 },
+    accuracy: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
 
-    date: { type: Date, default: Date.now },
+    date: {
+      type: Date,
+      default: Date.now,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-practiceSessionSchema.pre('save', function recalcAccuracy(next) {
+// ======================================================
+// CALCULATE ACCURACY BEFORE SAVING
+// ======================================================
+// Accuracy is calculated from the score and the total
+// number of questions.
+//
+// Example:
+// 8 correct out of 10 questions = 80%
+//
+// We calculate this automatically on the backend so the
+// value stored in the database is consistent.
+// ======================================================
+
+practiceSessionSchema.pre("save", function () {
   this.accuracy =
     this.numberOfQuestions > 0
       ? Math.round((this.score / this.numberOfQuestions) * 100)
       : 0;
-  next();
 });
 
-export default mongoose.model('PracticeSession', practiceSessionSchema);
+// Export the PracticeSession model.
+export default mongoose.model("PracticeSession", practiceSessionSchema);

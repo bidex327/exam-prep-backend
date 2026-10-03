@@ -13,6 +13,9 @@ import examRoutes from "./src/routes/examRoutes.js";
 import subjectRoutes from "./src/routes/subjectRoutes.js";
 import topicRoutes from "./src/routes/topicRoutes.js";
 
+// Practice API route
+import practiceRoutes from "./src/routes/practiceRoutes.js";
+
 dotenv.config();
 
 const app = express();
@@ -50,6 +53,9 @@ app.use("/api/auth", authRoute);
 app.use("/api/exams", examRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/topics", topicRoutes);
+
+// Practice API
+app.use("/api/practice", practiceRoutes);
 
 // Home route
 app.get("/", (req, res) => {
