@@ -16,6 +16,7 @@ import topicRoutes from "./src/routes/topicRoutes.js";
 
 // Practice API route
 import practiceRoutes from "./src/routes/practiceRoutes.js";
+import practiceSessionRoutes from "./src/routes/practiceSessionRoutes.js";
 
 dotenv.config();
 
@@ -46,10 +47,9 @@ export const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-<<<<<<< HEAD
+
 app.use("/api/onboarding", onboardingRoutes);
 
-=======
 // API routes
 app.use("/api/questions", questionRoutes);
 app.use("/api/dashboard", dashboardRoute);
@@ -61,9 +61,10 @@ app.use("/api/topics", topicRoutes);
 
 // Practice API
 app.use("/api/practice", practiceRoutes);
+app.use("/api/practice-sessions", practiceSessionRoutes);
 
 // Home route
->>>>>>> staging
+
 app.get("/", (req, res) => {
   res.send("Welcome to my API");
 });
