@@ -28,7 +28,9 @@ connectDb();
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "http://localhost:5500",
-  "http://127.0.0.1:5500"
+  "http://127.0.0.1:5500",
+   "https://snack-runtime.eascdn.net",
+  "https://snack.expo.dev"
 ];
 
 export const corsOptions = {
