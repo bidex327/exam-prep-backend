@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import PracticeSession from "../models/PracticeSession.js";
 
 export const getDashboard = async (req, res) => {
   try {
@@ -10,9 +11,16 @@ export const getDashboard = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Student not found",
-        data: {}
+        data: {},
       });
     }
+
+    // Get this student's practice sessions from the database
+    const practiceSessions = await PracticeSession.find({
+      studentId: user._id,
+    })
+      .populate("topicId", "name")
+      .sort({ date: -1 });
 
     return res.status(200).json({
       success: true,
@@ -23,11 +31,21 @@ export const getDashboard = async (req, res) => {
         selectedSubjects: user.selectedSubjects,
         questionsAttempted: user.questionsAttempted,
         studyStreak: user.studyStreak,
+
         progressPercentage: null,
         currentSubject: null,
         currentTopic: null,
-        recentAttempts: []
-      }
+
+        practiceSessions: practiceSessions.map((session) => ({
+          topic: session.topicId,
+          numberOfQuestions: session.numberOfQuestions,
+          score: session.score,
+          accuracy: session.accuracy,
+          date: session.date,
+        })),
+
+        recentAttempts: [],
+      },
     });
   } catch (error) {
     console.error("Dashboard error:", error);
@@ -36,7 +54,7 @@ export const getDashboard = async (req, res) => {
       success: false,
       message: "Failed to fetch dashboard",
       error: error.message,
-      data: {}
+      data: {},
     });
   }
 };

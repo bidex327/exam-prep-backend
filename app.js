@@ -16,6 +16,7 @@ import topicRoutes from "./src/routes/topicRoutes.js";
 
 // Practice API route
 import practiceRoutes from "./src/routes/practiceRoutes.js";
+import practiceSessionRoutes from "./src/routes/practiceSessionRoutes.js";
 
 dotenv.config();
 
@@ -27,7 +28,9 @@ connectDb();
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "http://localhost:5500",
-  "http://127.0.0.1:5500"
+  "http://127.0.0.1:5500",
+   "https://snack-runtime.eascdn.net",
+  "https://snack.expo.dev"
 ];
 
 export const corsOptions = {
@@ -47,8 +50,8 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 
+app.use("/api/onboarding", onboardingRoutes);
 
-//
 // API routes
 app.use("/api/questions", questionRoutes);
 app.use("/api/dashboard", dashboardRoute);
@@ -60,6 +63,7 @@ app.use("/api/topics", topicRoutes);
 
 // Practice API
 app.use("/api/practice", practiceRoutes);
+app.use("/api/practice-sessions", practiceSessionRoutes);
 
 // Home route
 
