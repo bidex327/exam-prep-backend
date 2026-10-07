@@ -46,15 +46,14 @@ export const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-<<<<<<< HEAD
-app.use("/api/onboarding", onboardingRoutes);
 
-=======
+
+//
 // API routes
 app.use("/api/questions", questionRoutes);
 app.use("/api/dashboard", dashboardRoute);
 app.use("/api/auth", authRoute);
-
+app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/exams", examRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/topics", topicRoutes);
@@ -63,7 +62,7 @@ app.use("/api/topics", topicRoutes);
 app.use("/api/practice", practiceRoutes);
 
 // Home route
->>>>>>> staging
+
 app.get("/", (req, res) => {
   res.send("Welcome to my API");
 });
