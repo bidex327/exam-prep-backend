@@ -5,25 +5,72 @@ import {
   getQuestionById,
   createQuestion,
   updateQuestion,
-  deleteQuestion
+  deleteQuestion,
 } from "../controllers/questionController.js";
+
+import protect from "../middlewares/authMiddleware.js";
+import teacherOnly from "../middlewares/teacherMiddleware.js";
 
 const router = express.Router();
 
-// Get all questions, with optional filters
+// ======================================================
+// GET ALL QUESTIONS
+// ======================================================
+// Students and teachers can retrieve questions.
+//
+// Supports filters:
+// ?examId=...
+// ?subjectId=...
+// ?topicId=...
+// ?year=...
+// ======================================================
+
 router.get("/", getQuestions);
 
-// Get one question by ID
+// ======================================================
+// GET ONE QUESTION
+// ======================================================
+// Get a specific question by ID.
+// ======================================================
+
 router.get("/:id", getQuestionById);
 
-// Create a new question
-router.post("/", createQuestion);
+// ======================================================
+// CREATE QUESTION
+// ======================================================
+// Only authenticated teachers can create questions.
+//
+// Flow:
+//
+// Request
+//   ↓
+// protect
+//   ↓
+// teacherOnly
+//   ↓
+// createQuestion
+// ======================================================
 
-// Update an existing question
-router.put("/:id", updateQuestion);
+router.post("/", protect, teacherOnly, createQuestion);
 
-// Delete an existing question
-router.delete("/:id", deleteQuestion);
+// ======================================================
+// UPDATE QUESTION
+// ======================================================
+// Only authenticated teachers can update questions.
+// ======================================================
 
-// Export the router so app.js can use it
+router.put("/:id", protect, teacherOnly, updateQuestion);
+
+// ======================================================
+// DELETE QUESTION
+// ======================================================
+// Only authenticated teachers can delete questions.
+// ======================================================
+
+router.delete("/:id", protect, teacherOnly, deleteQuestion);
+
+// ======================================================
+// EXPORT ROUTER
+// ======================================================
+
 export default router;
