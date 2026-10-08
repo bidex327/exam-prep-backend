@@ -1,30 +1,79 @@
 import mongoose from "mongoose";
 
+const praticeAnswerSchema = new mongoose.Schema(
+  {
+    question: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Question",
+      require: true
+    },
+    selectedAnswer: {
+      type: string,
+      required: true
+    },
+    correctAnswer: {
+      type: string,
+      required: true
+    },
+    isCorrect: {
+      type: Boolean,
+      required: true
+    },
+    answerAt: {
+      type: Date,
+      default: Date.now
+    }
+  }, { _id: true}
+)
+
+
 const practiceSessionSchema = new mongoose.Schema(
   {
-    studentId: {
+    user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
       index: true,
     },
 
-    topicId: {
+    subject: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      index: true
+    },
+    
+    topic: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Topic",
       required: true,
       index: true,
     },
 
+    question: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Question"
+      }
+    ],
+
+    answer: [practiceSessionSchema],
+    
     numberOfQuestions: {
       type: Number,
       required: true,
       min: 1,
     },
 
+    correctAnswer: {
+      type: Number,
+      required: true,
+      default: 0
+    },
+
     score: {
       type: Number,
       required: true,
+      default: null,
       min: 0,
     },
 
@@ -35,10 +84,24 @@ const practiceSessionSchema = new mongoose.Schema(
       max: 100,
     },
 
-    date: {
+    startedAt: {
       type: Date,
-      default: Date.now,
+      default: Date.now
     },
+
+    completedAt: {
+      type: Date,
+      default: null
+    },
+
+    status: {
+      type: String,
+      eunm: [
+        "in_progress","completed"
+      ],
+      default: "in_progress",
+      index: true
+    }
   },
   {
     timestamps: true,
