@@ -58,11 +58,12 @@ const practiceSessionSchema = new mongoose.Schema(
 // value stored in the database is consistent.
 // ======================================================
 
-practiceSessionSchema.pre("save", function () {
+practiceSessionSchema.pre("save", function (next) {
   this.accuracy =
     this.numberOfQuestions > 0
       ? Math.round((this.score / this.numberOfQuestions) * 100)
       : 0;
+  next();
 });
 
 // Export the PracticeSession model.

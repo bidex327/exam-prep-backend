@@ -58,12 +58,23 @@ const userSchema = new mongoose.Schema(
     lastActiveDate: {
       type: Date,
     },
+
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationToken: {
+      type: String, select: false,
+    },
+    verificationTokenExpiry: {
+      type: Date, select: false,
+    },
   },
   { timestamps: true }
 );
 
-userSchema.pre('save', async function hashPassword() {
-  if (!this.isModified('password')) return;
+userSchema.pre('save', async function hashPassword(next) {
+  if (!this.isModified('password')) return next();
 
   this.password = await bcrypt.hash(this.password, 10);
 });

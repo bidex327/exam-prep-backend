@@ -4,6 +4,13 @@ const subjectSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
 
+    code: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+    },
+
     examId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Exam',
@@ -17,5 +24,6 @@ const subjectSchema = new mongoose.Schema(
 );
 
 subjectSchema.index({ name: 1, examId: 1 }, { unique: true });
+subjectSchema.index({ code: 1, examId: 1 }, { unique: true });
 
 export default mongoose.model('Subject', subjectSchema);
