@@ -56,7 +56,7 @@ app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/questions", questionRoutes);
 app.use("/api/dashboard", dashboardRoute);
 app.use("/api/auth", authRoute);
-
+app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/exams", examRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/topics", topicRoutes);
