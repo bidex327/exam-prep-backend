@@ -20,15 +20,24 @@ const questionSchema = new mongoose.Schema(
       ref: 'Subject', 
       required: true 
     },
-    topicId: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'Topic', 
-      required: true 
-    },
-    year: { 
-      type: Number, 
-      required: true 
-    },
+   topicId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'Topic',
+  required: true,
+  index: true,
+},
+
+createdBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'User',
+  required: true,
+  index: true,
+},
+
+year: {
+  type: Number,
+  required: true,
+},
     questionText: { 
       type: String, 
       required: true, 

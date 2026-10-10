@@ -1,85 +1,147 @@
 import mongoose from "mongoose";
+
 import Question from "../models/question.js";
+import Exam from "../models/Exam.js";
+import Subject from "../models/Subject.js";
+import Topic from "../models/Topic.js";
 
+// ======================================================
+// HELPER: Validate question relationships
+// ======================================================
 
+const validateQuestionRelationships = async ({
+  examId,
+  subjectId,
+  topicId,
+}) => {
+  const exam = await Exam.findById(examId);
 
+  if (!exam) {
+    return {
+      valid: false,
+      status: 404,
+      message: "Exam not found",
+    };
+  }
+
+  const subject = await Subject.findOne({
+    _id: subjectId,
+    examId,
+  });
+
+  if (!subject) {
+    return {
+      valid: false,
+      status: 400,
+      message: "Subject does not belong to the selected exam",
+    };
+  }
+
+  const topic = await Topic.findOne({
+    _id: topicId,
+    subjectId,
+  });
+
+  if (!topic) {
+    return {
+      valid: false,
+      status: 400,
+      message: "Topic does not belong to the selected subject",
+    };
+  }
+
+  return {
+    valid: true,
+    exam,
+    subject,
+    topic,
+  };
+};
+
+// ======================================================
+// GET ALL QUESTIONS
+// ======================================================
 
 export const getQuestions = async (req, res) => {
   try {
-
     const { examId, subjectId, topicId, year } = req.query;
 
-    // Start with an empty filter object.
     const filter = {};
 
-    // Filter by examId
+    // Validate examId
     if (examId) {
       if (!mongoose.isValidObjectId(examId)) {
         return res.status(400).json({
           success: false,
           message: "Invalid examId",
-          data: {}
+          data: {},
         });
       }
+
       filter.examId = examId;
     }
 
-    // Filter by subjectId
+    // Validate subjectId
     if (subjectId) {
       if (!mongoose.isValidObjectId(subjectId)) {
         return res.status(400).json({
           success: false,
           message: "Invalid subjectId",
-          data: {}
+          data: {},
         });
       }
+
       filter.subjectId = subjectId;
     }
 
-    // Filter by topicId
+    // Validate topicId
     if (topicId) {
       if (!mongoose.isValidObjectId(topicId)) {
         return res.status(400).json({
           success: false,
           message: "Invalid topicId",
-          data: {}
+          data: {},
         });
       }
+
       filter.topicId = topicId;
     }
 
-    // Filter by year
+    // Validate year
     if (year) {
       const numericYear = Number(year);
+
       if (!Number.isInteger(numericYear)) {
         return res.status(400).json({
           success: false,
           message: "Year must be a valid number",
-          data: {}
+          data: {},
         });
       }
+
       filter.year = numericYear;
     }
 
-    // Find questions using all supplied filters
-    const questions = await Question.find(filter);
+    // Do NOT expose isCorrect to students
+    const questions = await Question.find(filter).select(
+      "-options.isCorrect"
+    );
 
     return res.status(200).json({
       success: true,
       message: "Questions fetched successfully",
-      data: questions
+      data: questions,
     });
-
   } catch (error) {
-    console.error("Error fetching questions:", error);
+    console.error("GET QUESTIONS ERROR:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to fetch questions",
-      data: {}
+      data: {},
     });
   }
 };
-
 
 // ======================================================
 // GET ONE QUESTION BY ID
@@ -93,39 +155,41 @@ export const getQuestionById = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid question ID",
-        data: {}
+        data: {},
       });
     }
 
-    const question = await Question.findById(id);
+    // Do NOT expose isCorrect
+    const question = await Question.findById(id).select(
+      "-options.isCorrect"
+    );
 
     if (!question) {
       return res.status(404).json({
         success: false,
         message: "Question not found",
-        data: {}
+        data: {},
       });
     }
 
     return res.status(200).json({
       success: true,
       message: "Question fetched successfully",
-      data: question
+      data: question,
     });
-
   } catch (error) {
-    console.error("Error fetching question:", error);
+    console.error("GET QUESTION ERROR:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to fetch question",
-      data: {}
+      data: {},
     });
   }
 };
 
-
 // ======================================================
-// CREATE A NEW QUESTION
+// CREATE QUESTION
 // ======================================================
 
 export const createQuestion = async (req, res) => {
@@ -137,38 +201,75 @@ export const createQuestion = async (req, res) => {
       year,
       questionText,
       options,
-      explanation
+      explanation,
     } = req.body;
 
+    // Validate required IDs
+    if (
+      !mongoose.isValidObjectId(examId) ||
+      !mongoose.isValidObjectId(subjectId) ||
+      !mongoose.isValidObjectId(topicId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid examId, subjectId, or topicId",
+        data: {},
+      });
+    }
+
+    // Validate Exam -> Subject -> Topic relationship
+    const relationship = await validateQuestionRelationships({
+      examId,
+      subjectId,
+      topicId,
+    });
+
+    if (!relationship.valid) {
+      return res.status(relationship.status).json({
+        success: false,
+        message: relationship.message,
+        data: {},
+      });
+    }
+
+    // createdBy comes from authenticated user
     const question = await Question.create({
       examId,
       subjectId,
       topicId,
+      createdBy: req.user._id,
       year,
       questionText,
       options,
-      explanation
+      explanation,
+    });
+
+    // Do not expose correct answers in response
+    const safeQuestion = question.toObject();
+
+    safeQuestion.options = safeQuestion.options.map((option) => {
+      const { isCorrect, ...safeOption } = option;
+      return safeOption;
     });
 
     return res.status(201).json({
       success: true,
       message: "Question created successfully",
-      data: question
+      data: safeQuestion,
     });
-
   } catch (error) {
-    console.error("Error creating question:", error);
+    console.error("CREATE QUESTION ERROR:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to create question",
-      data: {}
+      data: {},
     });
   }
 };
 
-
 // ======================================================
-// UPDATE AN EXISTING QUESTION
+// UPDATE QUESTION
 // ======================================================
 
 export const updateQuestion = async (req, res) => {
@@ -179,7 +280,32 @@ export const updateQuestion = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid question ID",
-        data: {}
+        data: {},
+      });
+    }
+
+    const question = await Question.findById(id);
+
+    if (!question) {
+      return res.status(404).json({
+        success: false,
+        message: "Question not found",
+        data: {},
+      });
+    }
+
+    // Teacher can only update their own question.
+    // Admin can update any question.
+    const isOwner =
+      question.createdBy.toString() === req.user._id.toString();
+
+    const isAdmin = req.user.role === "admin";
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to update this question",
+        data: {},
       });
     }
 
@@ -190,53 +316,90 @@ export const updateQuestion = async (req, res) => {
       year,
       questionText,
       options,
-      explanation
+      explanation,
     } = req.body;
 
-    const question = await Question.findByIdAndUpdate(
-      id,
-      {
-        examId,
-        subjectId,
-        topicId,
-        year,
-        questionText,
-        options,
-        explanation
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    );
+    // Use existing relationships if they were not supplied
+    const newExamId = examId || question.examId;
+    const newSubjectId = subjectId || question.subjectId;
+    const newTopicId = topicId || question.topicId;
 
-    if (!question) {
-      return res.status(404).json({
+    if (
+      !mongoose.isValidObjectId(newExamId) ||
+      !mongoose.isValidObjectId(newSubjectId) ||
+      !mongoose.isValidObjectId(newTopicId)
+    ) {
+      return res.status(400).json({
         success: false,
-        message: "Question not found",
-        data: {}
+        message: "Invalid examId, subjectId, or topicId",
+        data: {},
       });
     }
+
+    // Validate Exam -> Subject -> Topic relationship
+    const relationship = await validateQuestionRelationships({
+      examId: newExamId,
+      subjectId: newSubjectId,
+      topicId: newTopicId,
+    });
+
+    if (!relationship.valid) {
+      return res.status(relationship.status).json({
+        success: false,
+        message: relationship.message,
+        data: {},
+      });
+    }
+
+    question.examId = newExamId;
+    question.subjectId = newSubjectId;
+    question.topicId = newTopicId;
+
+    if (year !== undefined) {
+      question.year = year;
+    }
+
+    if (questionText !== undefined) {
+      question.questionText = questionText;
+    }
+
+    if (options !== undefined) {
+      question.options = options;
+    }
+
+    if (explanation !== undefined) {
+      question.explanation = explanation;
+    }
+
+    // Do NOT allow createdBy to be changed
+    await question.save();
+
+    // Hide correct answers
+    const safeQuestion = question.toObject();
+
+    safeQuestion.options = safeQuestion.options.map((option) => {
+      const { isCorrect, ...safeOption } = option;
+      return safeOption;
+    });
 
     return res.status(200).json({
       success: true,
       message: "Question updated successfully",
-      data: question
+      data: safeQuestion,
     });
-
   } catch (error) {
-    console.error("Error updating question:", error);
+    console.error("UPDATE QUESTION ERROR:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to update question",
-      data: {}
+      data: {},
     });
   }
 };
 
-
 // ======================================================
-// DELETE AN EXISTING QUESTION
+// DELETE QUESTION
 // ======================================================
 
 export const deleteQuestion = async (req, res) => {
@@ -247,32 +410,49 @@ export const deleteQuestion = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid question ID",
-        data: {}
+        data: {},
       });
     }
 
-    const question = await Question.findByIdAndDelete(id);
+    const question = await Question.findById(id);
 
     if (!question) {
       return res.status(404).json({
         success: false,
         message: "Question not found",
-        data: {}
+        data: {},
       });
     }
+
+    // Teacher can only delete their own question.
+    // Admin can delete any question.
+    const isOwner =
+      question.createdBy.toString() === req.user._id.toString();
+
+    const isAdmin = req.user.role === "admin";
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to delete this question",
+        data: {},
+      });
+    }
+
+    await question.deleteOne();
 
     return res.status(200).json({
       success: true,
       message: "Question deleted successfully",
-      data: question
+      data: {},
     });
-
   } catch (error) {
-    console.error("Error deleting question:", error);
+    console.error("DELETE QUESTION ERROR:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to delete question",
-      data: {}
+      data: {},
     });
   }
 };
