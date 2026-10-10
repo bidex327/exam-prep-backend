@@ -5,25 +5,50 @@ import {
   getQuestionById,
   createQuestion,
   updateQuestion,
-  deleteQuestion
+  deleteQuestion,
 } from "../controllers/questionController.js";
+
+import protect, {
+  authorize,
+} from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// Get all questions, with optional filters
-router.get("/", getQuestions);
+// Get all questions
+// Logged-in users can view questions
+router.get("/", protect, getQuestions);
 
-// Get one question by ID
-router.get("/:id", getQuestionById);
+// Get one question
+// Logged-in users can view questions
+router.get("/:id", protect, getQuestionById);
 
-// Create a new question
-router.post("/", createQuestion);
+// Create a question
+// Only teachers and admins
+router.post(
+  "/",
+  protect,
+  authorize("teacher", "admin"),
+  createQuestion
+);
 
-// Update an existing question
-router.put("/:id", updateQuestion);
+// Update a question
+// Only teachers and admins
+// Controller additionally checks ownership for teachers
+router.put(
+  "/:id",
+  protect,
+  authorize("teacher", "admin"),
+  updateQuestion
+);
 
-// Delete an existing question
-router.delete("/:id", deleteQuestion);
+// Delete a question
+// Only teachers and admins
+// Controller additionally checks ownership for teachers
+router.delete(
+  "/:id",
+  protect,
+  authorize("teacher", "admin"),
+  deleteQuestion
+);
 
-// Export the router so app.js can use it
 export default router;

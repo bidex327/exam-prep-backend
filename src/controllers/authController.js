@@ -1,10 +1,7 @@
-
 import crypto from "crypto";
 import User from "../models/User.js";
-import generateToken from "../utils/generateToken.js"; // still used by login
+import generateToken from "../utils/generateToken.js";
 import { sendMail } from "../config/sendMailDb.js";
-
-
 
 // POST /api/auth/register
 export const register = async (req, res) => {
@@ -20,8 +17,9 @@ export const register = async (req, res) => {
       });
     }
 
-    // Verification is sent by email, so require a valid email
+    // Email verification requires an actual email address.
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailOrPhone);
+
     if (!isEmail) {
       return res.status(400).json({
         success: false,
@@ -31,6 +29,7 @@ export const register = async (req, res) => {
     }
 
     const existingUser = await User.findOne({ emailOrPhone });
+
     if (existingUser) {
       return res.status(409).json({
         success: false,
@@ -39,20 +38,20 @@ export const register = async (req, res) => {
       });
     }
 
-    // Generate verification token (valid for 24 hours)
+    // Generate a verification token valid for 24 hours.
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationTokenExpiry = Date.now() + 24 * 60 * 60 * 1000;
+    const verificationTokenExpires =
+      Date.now() + 24 * 60 * 60 * 1000;
 
     const user = await User.create({
       fullName,
       emailOrPhone,
       password,
       emailVerified: false,
-      verificationToken,
-      verificationTokenExpiry,
+      emailVerificationToken: verificationToken,
+      emailVerificationExpires: verificationTokenExpires,
     });
 
-    // Send the verification email
     const link = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
 
     try {
@@ -62,24 +61,34 @@ export const register = async (req, res) => {
         html: `
           <h2>Welcome to ExamPrep NG, ${user.fullName}!</h2>
           <p>Click the link below to verify your email address:</p>
-          <p><a href="${link}">${link}</a></p>
+          <p>
+            <a href="${link}">${link}</a>
+          </p>
           <p>This link expires in 24 hours.</p>
         `,
       });
     } catch (mailError) {
       console.error("VERIFICATION EMAIL ERROR:", mailError);
+
       return res.status(201).json({
         success: true,
         message:
           "Account created, but we could not send the verification email. Please use resend-verification.",
-        data: { user: { id: user._id, emailOrPhone: user.emailOrPhone } },
+        data: {
+          user: {
+            id: user._id,
+            emailOrPhone: user.emailOrPhone,
+          },
+        },
       });
     }
 
-    // NOTE: no JWT is returned here. The user must verify first, then log in.
+    // Do not return a JWT.
+    // The user must verify their email before logging in.
     return res.status(201).json({
       success: true,
-      message: "Registration successful. Please check your email to verify your account.",
+      message:
+        "Registration successful. Please check your email to verify your account.",
       data: {
         user: {
           id: user._id,
@@ -91,6 +100,7 @@ export const register = async (req, res) => {
     });
   } catch (error) {
     console.error("REGISTER ERROR:", error);
+
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -112,11 +122,10 @@ export const verifyEmail = async (req, res) => {
       });
     }
 
-    // Find a user with this token that has not expired
     const user = await User.findOne({
-      verificationToken: token,
-      verificationTokenExpiry: { $gt: Date.now() },
-    }).select("+verificationToken +verificationTokenExpiry");
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: Date.now() },
+    });
 
     if (!user) {
       return res.status(400).json({
@@ -126,9 +135,13 @@ export const verifyEmail = async (req, res) => {
       });
     }
 
+    // Mark the account as verified.
     user.emailVerified = true;
-    user.verificationToken = undefined;        // invalidate the token
-    user.verificationTokenExpiry = undefined;
+
+    // Invalidate the token after successful verification.
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+
     await user.save();
 
     return res.status(200).json({
@@ -138,6 +151,7 @@ export const verifyEmail = async (req, res) => {
     });
   } catch (error) {
     console.error("VERIFY EMAIL ERROR:", error);
+
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -161,10 +175,11 @@ export const resendVerification = async (req, res) => {
 
     const user = await User.findOne({ emailOrPhone });
 
-    // Generic response so this endpoint can't be used to discover registered emails
+    // Generic response for accounts that don't exist.
     const genericResponse = {
       success: true,
-      message: "If this account exists and is not verified, a new verification email has been sent.",
+      message:
+        "If this account exists and is not verified, a new verification email has been sent.",
       data: {},
     };
 
@@ -180,10 +195,13 @@ export const resendVerification = async (req, res) => {
       });
     }
 
-    // Always generate a NEW token (never reuse an expired one)
+    // Generate a completely new token.
     const verificationToken = crypto.randomBytes(32).toString("hex");
-    user.verificationToken = verificationToken;
-    user.verificationTokenExpiry = Date.now() + 24 * 60 * 60 * 1000;
+
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires =
+      Date.now() + 24 * 60 * 60 * 1000;
+
     await user.save();
 
     const link = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
@@ -194,7 +212,9 @@ export const resendVerification = async (req, res) => {
       html: `
         <h2>Hello ${user.fullName},</h2>
         <p>Here is your new verification link:</p>
-        <p><a href="${link}">${link}</a></p>
+        <p>
+          <a href="${link}">${link}</a>
+        </p>
         <p>This link expires in 24 hours.</p>
       `,
     });
@@ -202,6 +222,7 @@ export const resendVerification = async (req, res) => {
     return res.status(200).json(genericResponse);
   } catch (error) {
     console.error("RESEND VERIFICATION ERROR:", error);
+
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -244,11 +265,12 @@ export const login = async (req, res) => {
       });
     }
 
-    // Block login until the email is verified
+    // User must verify their email before receiving a JWT.
     if (!user.emailVerified) {
       return res.status(403).json({
         success: false,
-        message: "Email not verified. Please check your inbox or request a new verification link.",
+        message:
+          "Email not verified. Please check your inbox or request a new verification link.",
         data: {},
       });
     }
@@ -269,6 +291,8 @@ export const login = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("LOGIN ERROR:", error);
+
     return res.status(500).json({
       success: false,
       message: error.message,

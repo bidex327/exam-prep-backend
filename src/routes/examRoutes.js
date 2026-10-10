@@ -2,15 +2,28 @@ import express from "express";
 
 import {
   createExam,
-  getExams
+  getExams,
 } from "../controllers/examController.js";
+
+import protect, {
+  authorize,
+} from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// Create a new exam
-router.post("/", createExam);
+// Create an exam — admins only
+router.post(
+  "/",
+  protect,
+  authorize("admin", "teacher"),
+  createExam
+);
 
-// Get all exams
-router.get("/", getExams);
+// Get exams — authenticated users
+router.get(
+  "/",
+  protect,
+  getExams
+);
 
 export default router;

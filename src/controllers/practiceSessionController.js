@@ -1,5 +1,6 @@
 import PracticeSession from "../models/PracticeSession.js";
 
+
 export const getPracticeSessions = async (req, res) => {
   try {
     const practiceSessions = await PracticeSession.find({

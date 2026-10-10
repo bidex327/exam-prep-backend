@@ -24,13 +24,13 @@ const practiceSessionSchema = new mongoose.Schema(
 
     score: {
       type: Number,
-      required: true,
+      default: null,
       min: 0,
     },
 
     accuracy: {
       type: Number,
-      default: 0,
+      default: null,
       min: 0,
       max: 100,
     },
@@ -45,25 +45,17 @@ const practiceSessionSchema = new mongoose.Schema(
   }
 );
 
-// ======================================================
-// CALCULATE ACCURACY BEFORE SAVING
-// ======================================================
-// Accuracy is calculated from the score and the total
-// number of questions.
-//
-// Example:
-// 8 correct out of 10 questions = 80%
-//
-// We calculate this automatically on the backend so the
-// value stored in the database is consistent.
-// ======================================================
-
+// Calculate accuracy only when a score exists.
 practiceSessionSchema.pre("save", function () {
+  if (this.score === null || this.score === undefined) {
+    this.accuracy = null;
+    return;
+  }
+
   this.accuracy =
     this.numberOfQuestions > 0
       ? Math.round((this.score / this.numberOfQuestions) * 100)
-      : 0;
+      : null;
 });
 
-// Export the PracticeSession model.
 export default mongoose.model("PracticeSession", practiceSessionSchema);
