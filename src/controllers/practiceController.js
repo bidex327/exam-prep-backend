@@ -5,7 +5,7 @@ import Attempt from "../models/Attempt.js";
 import AttemptAnswer from "../models/AttemptAnswer.js";
 import PracticeSession from "../models/PracticeSession.js";
 import User from "../models/User.js";
-import { updateStudyStreak } from "../utils/updateStudyStreak.js";
+import { updateStudyStreak } from "../utils/updateStreak.js";
 
 // ======================================================
 // HELPER: VALIDATE OPTIONAL OBJECTID FILTERS

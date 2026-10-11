@@ -29,3 +29,4 @@ if (differenceInDays === 1) {
 
 user.lastActiveDate = currentDate;
 }
+

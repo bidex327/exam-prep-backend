@@ -8,7 +8,7 @@ import Subject from "../models/Subject.js";
 import Topic from "../models/Topic.js";
 import PracticeSession from "../models/PracticeSession.js";
 import User from "../models/User.js";
-import { updateStudyStreak } from "../utils/updateStudyStreak.js";
+import { updateStudyStreak } from "../utils/updateStreak.js";
 
 // ======================================================
 // START ATTEMPT
