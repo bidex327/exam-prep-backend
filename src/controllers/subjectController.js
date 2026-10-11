@@ -153,3 +153,60 @@ export const getSubjects = async (req, res) => {
     });
   }
 };
+// ======================================================
+// UPDATE SUBJECT
+// ======================================================
+
+export const updateSubject = async (req, res) => {
+  try {
+    const { subjectId } = req.params;
+    const { isCompulsory } = req.body;
+
+    // Validate subject ID
+    if (!mongoose.isValidObjectId(subjectId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid subjectId",
+        data: {},
+      });
+    }
+
+    // Validate the compulsory status
+    if (typeof isCompulsory !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "isCompulsory must be true or false",
+        data: {},
+      });
+    }
+
+    // Find the subject and update its compulsory status
+    const subject = await Subject.findByIdAndUpdate(
+      subjectId,
+      { isCompulsory },
+      { new: true, runValidators: true }
+    );
+
+    if (!subject) {
+      return res.status(404).json({
+        success: false,
+        message: "Subject not found",
+        data: {},
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Subject updated successfully",
+      data: subject,
+    });
+  } catch (error) {
+    console.error("UPDATE SUBJECT ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update subject",
+      data: {},
+    });
+  }
+};
