@@ -18,11 +18,18 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
     },
 
-    password: {
-      type: String,
-      required: true,
-      select: false,
-    },
+   password: {
+  type: String,
+  required: function () {
+    return !this.googleId;
+  },
+  select: false,
+},
+googleId: {
+  type: String,
+  unique: true,
+  sparse: true,
+},
 
     role: {
       type: String,
@@ -72,6 +79,18 @@ const userSchema = new mongoose.Schema(
     emailVerificationExpires: {
       type: Date,
       default: null,
+    },
+        // Password reset
+    passwordResetToken: {
+      type: String,
+      default: null,
+      select: false,
+    },
+
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+      select: false,
     },
   },
   { timestamps: true }

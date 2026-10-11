@@ -34,7 +34,7 @@ export const getDashboard = async (req, res) => {
     // Get student information
     const user = await User.findById(req.user._id)
       .populate("targetExam")
-      .populate("selectedSubjects", "name");
+      .populate("selectedSubjects", "name icon");
 
     if (!user) {
       return res.status(404).json({
@@ -47,7 +47,7 @@ export const getDashboard = async (req, res) => {
     // Get this week's completed attempts
     const thisWeekAttempts = await Attempt.find({
       userId: user._id,
-      status: "completed",
+     status: { $in: ["completed", "auto-submitted"] },
       submittedAt: {
         $gte: thisWeekStart,
         $lte: now,
@@ -57,7 +57,7 @@ export const getDashboard = async (req, res) => {
     // Get last week's completed attempts
     const lastWeekAttempts = await Attempt.find({
       userId: user._id,
-      status: "completed",
+      status: { $in: ["completed", "auto-submitted"] },
       submittedAt: {
         $gte: lastWeekStart,
         $lte: lastWeekEnd,
@@ -146,62 +146,79 @@ export const getDashboard = async (req, res) => {
       thisWeekStudyDays.size - lastWeekStudyDays.size;
 
     // Calculate time spent this week
-    const thisWeekTimeMs = thisWeekAttempts.reduce(
-      (total, attempt) => {
-        if (
-          attempt.startedAt &&
-          attempt.submittedAt &&
-          attempt.submittedAt >= attempt.startedAt
-        ) {
-          return (
-            total +
-            (attempt.submittedAt - attempt.startedAt)
-          );
-        }
+// Get this student's practice sessions
+const practiceSessions = await PracticeSession.find({
+  studentId: user._id,
+})
+  .populate("subjectId", "name icon")
+  .populate("topicId", "name icon")
+  .sort({ date: -1 });
 
-        return total;
-      },
-      0
-    );
+// Calculate practice time this week
+const thisWeekTimeSeconds = practiceSessions.reduce(
+  (total, session) => {
+    const sessionDate = new Date(session.date);
 
-    // Calculate time spent last week
-    const lastWeekTimeMs = lastWeekAttempts.reduce(
-      (total, attempt) => {
-        if (
-          attempt.startedAt &&
-          attempt.submittedAt &&
-          attempt.submittedAt >= attempt.startedAt
-        ) {
-          return (
-            total +
-            (attempt.submittedAt - attempt.startedAt)
-          );
-        }
+    if (
+      sessionDate >= thisWeekStart &&
+      sessionDate <= now
+    ) {
+      return total + (session.durationSeconds || 0);
+    }
 
-        return total;
-      },
-      0
-    );
+    return total;
+  },
+  0
+);
 
-    // Convert practice time to minutes
-    const thisWeekTimeMinutes = Math.round(
-      thisWeekTimeMs / 60000
-    );
+// Calculate practice time last week
+const lastWeekTimeSeconds = practiceSessions.reduce(
+  (total, session) => {
+    const sessionDate = new Date(session.date);
 
-    const lastWeekTimeMinutes = Math.round(
-      lastWeekTimeMs / 60000
-    );
+    if (
+      sessionDate >= lastWeekStart &&
+      sessionDate <= lastWeekEnd
+    ) {
+      return total + (session.durationSeconds || 0);
+    }
 
-    // Calculate practice time progress
-    const timeSpentPracticingProgress =
-      thisWeekTimeMinutes - lastWeekTimeMinutes;
+    return total;
+  },
+  0
+);
 
-    // Get this student's practice sessions
-    const practiceSessions = await PracticeSession.find({
-      studentId: user._id,
-    })
-      .populate("topicId", "name")
-      .sort({ date: -1 });
+// Convert practice time to minutes
+const thisWeekTimeMinutes = Math.round(
+  thisWeekTimeSeconds / 60
+);
+
+const lastWeekTimeMinutes = Math.round(
+  lastWeekTimeSeconds / 60
+);
+
+// Calculate practice time progress
+const timeSpentPracticingProgress =
+  thisWeekTimeMinutes - lastWeekTimeMinutes;
+      
+// Calculate practice-session statistics
+const totalPracticeSessions = practiceSessions.length;
+
+const thisWeekPracticeSessions = practiceSessions.filter(
+  (session) =>
+    session.date >= thisWeekStart &&
+    session.date <= now
+).length;
+
+const lastWeekPracticeSessions = practiceSessions.filter(
+  (session) =>
+    session.date >= lastWeekStart &&
+    session.date <= lastWeekEnd
+).length;
+
+const practiceSessionsProgress =
+  thisWeekPracticeSessions - lastWeekPracticeSessions;
+
 
     // Get the most recent practice session
     const latestPracticeSession = practiceSessions[0] || null;
@@ -213,10 +230,12 @@ export const getDashboard = async (req, res) => {
     // Get the five most recent completed attempts
     const recentAttempts = await Attempt.find({
       userId: user._id,
-      status: "completed",
+       status: {
+    $in: ["completed", "auto-submitted"],
+  },
     })
       .populate("examId", "name code")
-      .populate("subjectId", "name")
+      .populate("subjectId", "name icon")
       .sort({ submittedAt: -1 })
       .limit(5)
       .lean();
@@ -256,35 +275,176 @@ export const getDashboard = async (req, res) => {
     const currentSubject = latestAttempt
       ? latestAttempt.subjectId
       : null;
+      
+// Calculate overall performance for each subject
+const subjectPerformance = await Attempt.aggregate([
+  {
+    $match: {
+      userId: new mongoose.Types.ObjectId(user._id.toString()),
+      status: { $in: ["completed", "auto-submitted"] },
+    },
+  },
+  {
+    $group: {
+      _id: "$subjectId",
+      totalQuestions: { $sum: "$totalQuestions" },
+      correctAnswers: { $sum: "$correctCount" },
+      totalAttempts: { $sum: 1 },
+    },
+  },
+{
+  $project: {
+    totalQuestions: 1,
+    totalCorrect: 1,
+    accuracy: {
+      $cond: [
+        { $gt: ["$totalQuestions", 0] },
+        {
+          $round: [
+            {
+              $multiply: [
+                {
+                  $divide: [
+                    "$totalCorrect",
+                    "$totalQuestions",
+                  ],
+                },
+                100,
+              ],
+            },
+            0,
+          ],
+        },
+        0,
+      ],
+    },
+  },
+},
+  {
+    $sort: { accuracy: -1 },
+  },
+]);
+// Retrieve subject names for the performance results
+const subjectIds = subjectPerformance.map(
+  (item) => item.subjectId
+);
+
+const subjectDetails = await mongoose.model("Subject").find({
+  _id: { $in: subjectIds },
+}).select("name icon");
+
+const subjectNameMap = new Map(
+  subjectDetails.map((subject) => [
+    subject._id.toString(),
+    {
+      name: subject.name,
+      icon: subject.icon,
+    },
+  ])
+);
+
+const formattedSubjectPerformance = subjectPerformance.map(
+  (performance) => {
+    const subjectDetailsForId = subjectNameMap.get(
+      performance.subjectId.toString()
+    );
+
+    return {
+      subjectId: performance.subjectId,
+      subject: subjectDetailsForId
+        ? subjectDetailsForId.name
+        : "Unknown subject",
+      icon: subjectDetailsForId
+        ? subjectDetailsForId.icon
+        : "",
+      totalQuestions: performance.totalQuestions,
+      correctAnswers: performance.correctAnswers,
+      totalAttempts: performance.totalAttempts,
+      accuracy: performance.accuracy,
+    };
+  }
+);
+
 
     // Calculate topic performance across all practice sessions
-    const topicPerformance = await PracticeSession.aggregate([
-      {
-        $match: {
-          studentId: new mongoose.Types.ObjectId(
-            user._id.toString()
-          ),
-          score: {
-            $ne: null,
+   const topicPerformance = await PracticeSession.aggregate([
+  {
+    $match: {
+      studentId: new mongoose.Types.ObjectId(
+        user._id.toString()
+      ),
+    },
+  },
+
+  // Use the new breakdown when available.
+  // Fall back to the original fields for older sessions.
+  {
+    $set: {
+      effectiveTopicBreakdown: {
+        $cond: [
+          {
+            $gt: [
+              {
+                $size: {
+                  $ifNull: ["$topicBreakdown", []],
+                },
+              },
+              0,
+            ],
           },
-        },
+          "$topicBreakdown",
+          [
+            {
+              topicId: "$topicId",
+              numberOfQuestions: "$numberOfQuestions",
+              correctCount: "$score",
+            },
+          ],
+        ],
       },
-      {
-        $group: {
-          _id: "$topicId",
-          totalQuestions: {
-            $sum: "$numberOfQuestions",
-          },
-          totalCorrect: {
-            $sum: "$score",
-          },
-        },
+    },
+  },
+
+  {
+    $unwind: "$effectiveTopicBreakdown",
+  },
+
+  // Ignore historical sessions without a usable topic or score.
+  {
+    $match: {
+      "effectiveTopicBreakdown.topicId": {
+        $ne: null,
       },
-      {
-        $project: {
-          totalQuestions: 1,
-          totalCorrect: 1,
-          accuracy: {
+      "effectiveTopicBreakdown.correctCount": {
+        $ne: null,
+      },
+    },
+  },
+
+  // Combine results from all sessions for each topic.
+  {
+    $group: {
+      _id: "$effectiveTopicBreakdown.topicId",
+
+      totalQuestions: {
+        $sum: "$effectiveTopicBreakdown.numberOfQuestions",
+      },
+
+      totalCorrect: {
+        $sum: "$effectiveTopicBreakdown.correctCount",
+      },
+    },
+  },
+
+  {
+    $project: {
+      totalQuestions: 1,
+      totalCorrect: 1,
+
+      accuracy: {
+        $cond: [
+          { $gt: ["$totalQuestions", 0] },
+          {
             $round: [
               {
                 $multiply: [
@@ -300,25 +460,29 @@ export const getDashboard = async (req, res) => {
               0,
             ],
           },
-        },
+          0,
+        ],
       },
-      {
-        $match: {
-          accuracy: {
-            $lt: 50,
-          },
-        },
-      },
-      {
-        $sort: {
-          accuracy: 1,
-        },
-      },
-      {
-        $limit: 5,
-      },
-    ]);
+    },
+  },
 
+  // A weak topic is one with combined accuracy below 50%.
+  {
+    $match: {
+      accuracy: { $lt: 50 },
+    },
+  },
+
+  {
+    $sort: {
+      accuracy: 1,
+    },
+  },
+
+  {
+    $limit: 5,
+  },
+]);
     // Retrieve topic names for weak topics
     const weakTopicIds = topicPerformance.map(
       (item) => item._id
@@ -328,7 +492,7 @@ export const getDashboard = async (req, res) => {
       _id: {
         $in: weakTopicIds,
       },
-    }).select("name");
+    }).select("name icon");
 
     // Add topic names to the performance results
     const weakTopics = topicPerformance.map(
@@ -339,13 +503,14 @@ export const getDashboard = async (req, res) => {
             performance._id.toString()
         );
 
-        return {
-          topicId: performance._id,
-          topic: topic ? topic.name : "Unknown topic",
-          totalQuestions: performance.totalQuestions,
-          correctAnswers: performance.totalCorrect,
-          accuracy: performance.accuracy,
-        };
+       return {
+  topicId: performance._id,
+  topic: topic ? topic.name : "Unknown topic",
+  icon: topic ? topic.icon : "",
+  totalQuestions: performance.totalQuestions,
+  correctAnswers: performance.totalCorrect,
+  accuracy: performance.accuracy,
+};
       }
     );
 
@@ -363,41 +528,64 @@ export const getDashboard = async (req, res) => {
 
         progressPercentage: thisWeekAccuracy,
 
-        progress: {
-          accuracy: thisWeekAccuracy,
-          accuracyProgress,
+       
+    progress: {
+      accuracy: thisWeekAccuracy,
+      accuracyProgress,
 
-          questionsCompleted: thisWeekQuestions,
-          questionsCompletedProgress,
+      questionsCompleted: thisWeekQuestions,
+      questionsCompletedProgress,
 
-          studyStreak: user.studyStreak,
+      studyStreak: user.studyStreak,
+      studyStreakProgress,
 
-          // This represents the change in active study days,
-          // not the actual consecutive-day streak change.
-          studyStreakProgress,
+      timeSpentPracticing: thisWeekTimeMinutes,
+      timeSpentPracticingProgress,
 
-          timeSpentPracticing: thisWeekTimeMinutes,
-          timeSpentPracticingProgress,
+      practiceSessions: thisWeekPracticeSessions,
+      practiceSessionsProgress,
+      totalPracticeSessions,
 
-          date: now.toISOString().split("T")[0],
-        },
+      date: now.toISOString().split("T")[0],
+    },
 
-        currentSubject,
-        currentTopic,
 
-        // Topics with combined accuracy below 50%
-        weakTopics,
 
-        // Practice sessions
-        practiceSessions: practiceSessions.map(
-          (session) => ({
-            topic: session.topicId,
-            numberOfQuestions: session.numberOfQuestions,
-            score: session.score,
-            accuracy: session.accuracy,
-            date: session.date,
-          })
-        ),
+ currentSubject,
+currentTopic,
+
+// Overall performance for each subject
+subjectPerformance: formattedSubjectPerformance,
+
+// Topics with combined accuracy below 50%
+weakTopics,
+
+      practiceSessions: practiceSessions.map((session) => ({
+  _id: session._id,
+
+  subject: session.subjectId
+    ? {
+        _id: session.subjectId._id,
+        name: session.subjectId.name,
+        icon: session.subjectId.icon,
+      }
+    : null,
+
+  topic: session.topicId
+    ? {
+        _id: session.topicId._id,
+        name: session.topicId.name,
+        icon: session.topicId.icon,
+      }
+    : null,
+
+  mode: session.mode,
+  numberOfQuestions: session.numberOfQuestions,
+  score: session.score,
+  accuracy: session.accuracy,
+  durationSeconds: session.durationSeconds,
+  date: session.date,
+})),
 
         // Recent activity history
         recentAttempts: recentAttempts.map((attempt) => ({
