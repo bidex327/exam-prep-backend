@@ -1,5 +1,26 @@
 import mongoose from "mongoose";
 
+const topicBreakdownSchema = new mongoose.Schema(
+  {
+    topicId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Topic",
+      required: true,
+    },
+    numberOfQuestions: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    correctCount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false }
+);
+
 const practiceSessionSchema = new mongoose.Schema(
   {
     studentId: {
@@ -9,11 +30,39 @@ const practiceSessionSchema = new mongoose.Schema(
       index: true,
     },
 
+    subjectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Subject",
+      required: true,
+      index: true,
+    },
+
+    // Retained for compatibility with sessions containing one topic.
     topicId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Topic",
-      required: true,
+      default: null,
       index: true,
+    },
+
+    // All topics covered by this session.
+    topicIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Topic",
+      },
+    ],
+
+    // Accurate performance statistics for each individual topic.
+    topicBreakdown: {
+      type: [topicBreakdownSchema],
+      default: [],
+    },
+
+    mode: {
+      type: String,
+      enum: ["practice", "timed-cbt"],
+      required: true,
     },
 
     numberOfQuestions: {
@@ -25,6 +74,12 @@ const practiceSessionSchema = new mongoose.Schema(
     score: {
       type: Number,
       default: null,
+      min: 0,
+    },
+
+    durationSeconds: {
+      type: Number,
+      default: 0,
       min: 0,
     },
 
@@ -40,12 +95,9 @@ const practiceSessionSchema = new mongoose.Schema(
       default: Date.now,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Calculate accuracy only when a score exists.
 practiceSessionSchema.pre("save", function () {
   if (this.score === null || this.score === undefined) {
     this.accuracy = null;
@@ -54,8 +106,13 @@ practiceSessionSchema.pre("save", function () {
 
   this.accuracy =
     this.numberOfQuestions > 0
-      ? Math.round((this.score / this.numberOfQuestions) * 100)
+      ? Math.round(
+          (this.score / this.numberOfQuestions) * 100
+        )
       : null;
 });
 
-export default mongoose.model("PracticeSession", practiceSessionSchema);
+export default mongoose.model(
+  "PracticeSession",
+  practiceSessionSchema
+);

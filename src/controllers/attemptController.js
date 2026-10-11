@@ -8,6 +8,7 @@ import Subject from "../models/Subject.js";
 import Topic from "../models/Topic.js";
 import PracticeSession from "../models/PracticeSession.js";
 import User from "../models/User.js";
+import { updateStudyStreak } from "../utils/updateStudyStreak.js";
 
 // ======================================================
 // START ATTEMPT
@@ -16,11 +17,12 @@ import User from "../models/User.js";
 export const startAttempt = async (req, res) => {
 try {
 const {
-examId,
-subjectId,
-topicId,
-numberOfQuestions,
-mode,
+  examId,
+  subjectId,
+  topicId,
+  numberOfQuestions,
+  mode,
+  durationMinutes,
 } = req.body;
 
 
@@ -30,6 +32,21 @@ if (!examId || !subjectId || numberOfQuestions === undefined) {
     success: false,
     message:
       "examId, subjectId and numberOfQuestions are required",
+    data: {},
+  });
+}
+// Validate the selected practice duration, if provided.
+if (
+  durationMinutes !== undefined &&
+  (
+    !Number.isInteger(durationMinutes) ||
+    durationMinutes < 1 ||
+    durationMinutes > 180
+  )
+) {
+  return res.status(400).json({
+    success: false,
+    message: "durationMinutes must be an integer between 1 and 180",
     data: {},
   });
 }
@@ -117,11 +134,46 @@ if (topicId) {
   }
 }
 
-// Build question filter
+// Build the question filter.
 const questionFilter = {
   examId: new mongoose.Types.ObjectId(examId),
   subjectId: new mongoose.Types.ObjectId(subjectId),
 };
+
+if (topicId) {
+  questionFilter.topicId = new mongoose.Types.ObjectId(topicId);
+}
+
+// Accept either a single year or an array of years.
+const selectedYears = req.body.years ?? (
+  req.body.year !== undefined
+    ? [req.body.year]
+    : undefined
+);
+
+if (selectedYears !== undefined) {
+  if (
+    !Array.isArray(selectedYears) ||
+    selectedYears.length === 0 ||
+    selectedYears.some(
+      (year) =>
+        !Number.isInteger(year) ||
+        year < 1900 ||
+        year > new Date().getFullYear()
+    )
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "years must be a non-empty array of valid year numbers",
+      data: {},
+    });
+  }
+
+  questionFilter.year = {
+    $in: [...new Set(selectedYears)],
+  };
+}
 
 if (topicId) {
   questionFilter.topicId = new mongoose.Types.ObjectId(topicId);
@@ -162,6 +214,7 @@ if (questions.length < questionCount) {
 }
 
 // Create attempt
+
 const attempt = await Attempt.create({
   userId: req.user._id,
   examId,
@@ -173,7 +226,9 @@ const attempt = await Attempt.create({
   correctCount: 0,
   score: null,
   accuracy: null,
+  durationMinutes: durationMinutes ?? null,
 });
+
 
 // Return questions without revealing correct answers
 return res.status(201).json({
@@ -186,6 +241,7 @@ return res.status(201).json({
     mode: attempt.mode,
     status: attempt.status,
     totalQuestions: attempt.totalQuestions,
+    durationMinutes: attempt.durationMinutes,
     startedAt: attempt.startedAt,
     questions,
   },
@@ -211,307 +267,328 @@ return res.status(500).json({
 // ======================================================
 
 export const submitAttempt = async (req, res) => {
-try {
-const { id } = req.params;
-const { answers } = req.body;
+  try {
+    const { id } = req.params;
+    const { answers } = req.body;
 
-// Validate attempt ID
-if (!mongoose.isValidObjectId(id)) {
-  return res.status(400).json({
-    success: false,
-    message: "Invalid attempt ID",
-    data: {},
-  });
-}
-
-// Validate answers
-if (!Array.isArray(answers)) {
-  return res.status(400).json({
-    success: false,
-    message: "answers must be an array",
-    data: {},
-  });
-}
-
-// Find student's attempt
-const attempt = await Attempt.findOne({
-  _id: id,
-  userId: req.user._id,
-});
-
-if (!attempt) {
-  return res.status(404).json({
-    success: false,
-    message: "Attempt not found",
-    data: {},
-  });
-}
-
-// Prevent duplicate submission
-if (attempt.status !== "in-progress") {
-  return res.status(400).json({
-    success: false,
-    message: "This attempt has already been submitted",
-    data: {},
-  });
-}
-
-// Make sure this attempt has assigned questions
-if (
-  !Array.isArray(attempt.questionIds) ||
-  attempt.questionIds.length !== attempt.totalQuestions
-) {
-  return res.status(500).json({
-    success: false,
-    message: "This attempt does not have valid assigned questions",
-    data: {},
-  });
-}
-
-// Validate submitted question IDs
-for (const answer of answers) {
-  if (!answer.questionId) {
-    return res.status(400).json({
-      success: false,
-      message: "Each answer must contain a questionId",
-      data: {},
-    });
-  }
-
-  if (!mongoose.isValidObjectId(answer.questionId)) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid questionId",
-      data: {},
-    });
-  }
-}
-
-// Prevent duplicate question answers
-const submittedQuestionIds = answers.map((answer) =>
-  answer.questionId.toString()
-);
-
-const uniqueQuestionIds = new Set(submittedQuestionIds);
-
-if (uniqueQuestionIds.size !== submittedQuestionIds.length) {
-  return res.status(400).json({
-    success: false,
-    message: "A question cannot be answered more than once",
-    data: {},
-  });
-}
-
-// Verify questions belong to this exact attempt
-const assignedQuestionIds = attempt.questionIds.map((questionId) =>
-  questionId.toString()
-);
-
-const allQuestionsBelongToAttempt =
-  submittedQuestionIds.every((questionId) =>
-    assignedQuestionIds.includes(questionId)
-  );
-
-if (!allQuestionsBelongToAttempt) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "One or more questions do not belong to this attempt",
-    data: {},
-  });
-}
-
-// Get the exact assigned questions
-const questions = await Question.find({
-  _id: {
-    $in: attempt.questionIds,
-  },
-});
-
-if (questions.length !== attempt.totalQuestions) {
-  return res.status(500).json({
-    success: false,
-    message:
-      "Some questions assigned to this attempt no longer exist",
-    data: {},
-  });
-}
-
-// Create a lookup for submitted answers
-const submittedAnswers = new Map();
-
-for (const answer of answers) {
-  submittedAnswers.set(
-    answer.questionId.toString(),
-    answer.selectedOption ?? null
-  );
-}
-
-// Grade all assigned questions
-let correctCount = 0;
-const attemptAnswers = [];
-
-for (const question of questions) {
-  const questionId = question._id.toString();
-
-  const selectedOption =
-    submittedAnswers.get(questionId) ?? null;
-
-  // Find the correct answer from the database
-  const correctOption = question.options.find(
-    (option) => option.isCorrect === true
-  );
-
-  if (!correctOption) {
-    return res.status(500).json({
-      success: false,
-      message:
-        "Question does not have a valid correct answer",
-      data: {},
-    });
-  }
-
-  // Validate the selected option
-  if (selectedOption !== null) {
-    const selectedOptionExists = question.options.some(
-      (option) => option.label === selectedOption
-    );
-
-    if (!selectedOptionExists) {
+    // Validate attempt ID.
+    if (!mongoose.isValidObjectId(id)) {
       return res.status(400).json({
         success: false,
-        message:
-          `Invalid option selected for question ${question._id}`,
+        message: "Invalid attempt ID",
         data: {},
       });
     }
-  }
 
-  const isCorrect =
-    selectedOption !== null &&
-    selectedOption === correctOption.label;
+    // Validate answers.
+    if (!Array.isArray(answers)) {
+      return res.status(400).json({
+        success: false,
+        message: "answers must be an array",
+        data: {},
+      });
+    }
 
-  if (isCorrect) {
-    correctCount += 1;
-  }
+    // Find the attempt belonging to the authenticated student.
+    const attempt = await Attempt.findOne({
+      _id: id,
+      userId: req.user._id,
+    });
 
-  attemptAnswers.push({
-    attemptId: attempt._id,
-    questionId: question._id,
-    topicId: question.topicId,
-    selectedOption,
-    isCorrect,
-  });
-}
+    if (!attempt) {
+      return res.status(404).json({
+        success: false,
+        message: "Attempt not found",
+        data: {},
+      });
+    }
 
-// Calculate score and accuracy
-const score = correctCount;
+    // Prevent duplicate submission.
+    if (attempt.status !== "in-progress") {
+      return res.status(400).json({
+        success: false,
+        message: "This attempt has already been submitted",
+        data: {},
+      });
+    }
 
-const accuracy =
-  attempt.totalQuestions > 0
-    ? Math.round(
-        (correctCount / attempt.totalQuestions) * 100
-      )
-    : 0;
+    // Determine whether the selected time limit has expired.
+    const now = new Date();
 
-// Save answer records
-await AttemptAnswer.insertMany(attemptAnswers);
+    const elapsedMilliseconds =
+      now.getTime() - attempt.startedAt.getTime();
 
-// Update attempt
-attempt.correctCount = correctCount;
-attempt.score = score;
-attempt.accuracy = accuracy;
-attempt.status = "completed";
+    const timeLimitExpired =
+      attempt.durationMinutes !== null &&
+      attempt.durationMinutes !== undefined &&
+      elapsedMilliseconds >= attempt.durationMinutes * 60 * 1000;
 
-// Ensure submission time is not earlier than start time
-const submittedAt = new Date();
+    // Reject an empty normal submission.
+    // An empty submission is allowed after expiry so that unanswered
+    // questions can be graded as incorrect.
+    if (answers.length === 0 && !timeLimitExpired) {
+      return res.status(400).json({
+        success: false,
+        message: "Submit at least one answer",
+        data: {},
+      });
+    }
 
-attempt.submittedAt =
-  submittedAt < attempt.startedAt
-    ? attempt.startedAt
-    : submittedAt;
+    // Ensure this attempt has assigned questions.
+    if (
+      !Array.isArray(attempt.questionIds) ||
+      attempt.questionIds.length !== attempt.totalQuestions
+    ) {
+      return res.status(500).json({
+        success: false,
+        message: "This attempt does not have valid assigned questions",
+        data: {},
+      });
+    }
 
-await attempt.save();
+    // Validate submitted answers.
+    for (const answer of answers) {
+      if (
+        !answer ||
+        !answer.questionId ||
+        !mongoose.isValidObjectId(answer.questionId)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Each answer must contain a valid questionId",
+          data: {},
+        });
+      }
 
-// Update the student's study streak
-const user = await User.findById(req.user._id);
-if (user) {
-    user.questionsAttempted =
-  (user.questionsAttempted || 0) + attempt.totalQuestions;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+      if (
+        answer.selectedOption !== undefined &&
+        answer.selectedOption !== null &&
+        typeof answer.selectedOption !== "string"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "selectedOption must be a string or null",
+          data: {},
+        });
+      }
+    }
 
-  const lastActiveDate = user.lastActiveDate
-    ? new Date(user.lastActiveDate)
-    : null;
-
-  if (lastActiveDate) {
-    lastActiveDate.setHours(0, 0, 0, 0);
-  }
-
-  if (!lastActiveDate) {
-    user.studyStreak = 1;
-  } else {
-    const millisecondsPerDay = 24 * 60 * 60 * 1000;
-
-    const daysSinceLastActive = Math.floor(
-      (today.getTime() - lastActiveDate.getTime()) /
-        millisecondsPerDay
+    // Prevent duplicate question answers.
+    const submittedQuestionIds = answers.map((answer) =>
+      answer.questionId.toString()
     );
 
-    if (daysSinceLastActive === 1) {
-      user.studyStreak += 1;
-    } else if (daysSinceLastActive > 1) {
-      user.studyStreak = 1;
+    if (
+      new Set(submittedQuestionIds).size !==
+      submittedQuestionIds.length
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "A question cannot be answered more than once",
+        data: {},
+      });
     }
+
+    // Verify that submitted questions belong to this attempt.
+    const assignedQuestionIds = attempt.questionIds.map((questionId) =>
+      questionId.toString()
+    );
+
+    const assignedQuestionSet = new Set(assignedQuestionIds);
+
+    const allQuestionsBelongToAttempt = submittedQuestionIds.every(
+      (questionId) => assignedQuestionSet.has(questionId)
+    );
+
+    if (!allQuestionsBelongToAttempt) {
+      return res.status(400).json({
+        success: false,
+        message: "One or more questions do not belong to this attempt",
+        data: {},
+      });
+    }
+
+    // Fetch all assigned questions, including unanswered ones.
+    const questions = await Question.find({
+      _id: { $in: attempt.questionIds },
+    });
+
+    if (questions.length !== attempt.totalQuestions) {
+      return res.status(500).json({
+        success: false,
+        message: "Some questions assigned to this attempt no longer exist",
+        data: {},
+      });
+    }
+
+    // Map submitted answers by question ID.
+    const submittedAnswers = new Map();
+
+    for (const answer of answers) {
+      submittedAnswers.set(
+        answer.questionId.toString(),
+        answer.selectedOption ?? null
+      );
+    }
+
+    // Grade every assigned question.
+    let correctCount = 0;
+    const attemptAnswers = [];
+
+    for (const question of questions) {
+      const questionId = question._id.toString();
+
+      // Missing answers become null and are graded as incorrect.
+      const selectedOption =
+        submittedAnswers.get(questionId) ?? null;
+
+      const correctOption = question.options.find(
+        (option) => option.isCorrect === true
+      );
+
+      if (!correctOption) {
+        return res.status(500).json({
+          success: false,
+          message: "Question does not have a valid correct answer",
+          data: {},
+        });
+      }
+
+      // Validate the selected option.
+      if (selectedOption !== null) {
+        const selectedOptionExists = question.options.some(
+          (option) => option.label === selectedOption
+        );
+
+        if (!selectedOptionExists) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid option selected for question ${question._id}`,
+            data: {},
+          });
+        }
+      }
+
+      const isCorrect =
+        selectedOption !== null &&
+        selectedOption === correctOption.label;
+
+      if (isCorrect) {
+        correctCount += 1;
+      }
+
+      attemptAnswers.push({
+        attemptId: attempt._id,
+        questionId: question._id,
+        topicId: question.topicId,
+        selectedOption,
+        isCorrect,
+      });
+    }
+
+    // Calculate results.
+    const score = correctCount;
+
+    const accuracy = Math.round(
+      (correctCount / attempt.totalQuestions) * 100
+    );
+
+    // Calculate actual elapsed time.
+    const submittedAt = new Date();
+
+    const finalSubmittedAt =
+      submittedAt < attempt.startedAt
+        ? attempt.startedAt
+        : submittedAt;
+
+    const durationSeconds = Math.max(
+      0,
+      Math.floor(
+        (finalSubmittedAt.getTime() -
+          attempt.startedAt.getTime()) /
+          1000
+      )
+    );
+
+    // Save answer records.
+    // The attempt is still in progress at this point, so the duplicate
+    // submission guard remains important.
+    await AttemptAnswer.deleteMany({
+      attemptId: attempt._id,
+    });
+
+    await AttemptAnswer.insertMany(attemptAnswers);
+
+    // Update the attempt.
+    attempt.correctCount = correctCount;
+    attempt.score = score;
+    attempt.accuracy = accuracy;
+    attempt.durationSeconds = durationSeconds;
+    attempt.submittedAt = finalSubmittedAt;
+
+    attempt.status = timeLimitExpired
+      ? "auto-submitted"
+      : "completed";
+
+    await attempt.save();
+
+    // Update the student's question count and study streak.
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+      user.questionsAttempted =
+        (user.questionsAttempted || 0) + attempt.totalQuestions;
+
+      updateStudyStreak(user);
+
+      await user.save();
+    }
+
+    // Create a practice-session record for practice attempts.
+    let practiceSession = null;
+
+    if (attempt.mode === "practice" && questions.length > 0) {
+      practiceSession = await PracticeSession.create({
+  studentId: req.user._id,
+  subjectId: attempt.subjectId,
+  topicId: questions[0].topicId,
+  mode: attempt.mode,
+  numberOfQuestions: attempt.totalQuestions,
+  score,
+  accuracy,
+  durationSeconds,
+  date: finalSubmittedAt,
+});
+    }
+
+    // Return the results.
+    return res.status(200).json({
+      success: true,
+      message: "Attempt submitted successfully",
+      data: {
+        attemptId: attempt._id,
+        practiceSessionId: practiceSession?._id ?? null,
+        totalQuestions: attempt.totalQuestions,
+        correctCount: attempt.correctCount,
+        score: attempt.score,
+        accuracy: attempt.accuracy,
+        status: attempt.status,
+        autoSubmitted: attempt.status === "auto-submitted",
+        durationMinutes: attempt.durationMinutes,
+        durationSeconds: attempt.durationSeconds,
+        startedAt: attempt.startedAt,
+        submittedAt: attempt.submittedAt,
+      },
+    });
+  } catch (error) {
+    console.error("SUBMIT ATTEMPT ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to submit attempt",
+      data: {},
+    });
   }
-
-  user.lastActiveDate = new Date();
-
-  await user.save();
-}
-
-// Create a practice session for practice attempts
-let practiceSession = null;
-
-if (attempt.mode === "practice" && questions.length > 0) {
-  practiceSession = await PracticeSession.create({
-    studentId: req.user._id,
-    topicId: questions[0].topicId,
-    numberOfQuestions: attempt.totalQuestions,
-    score: attempt.score,
-    accuracy: attempt.accuracy,
-  });
-}
-
-// Return result
-return res.status(200).json({
-  success: true,
-  message: "Attempt submitted successfully",
-  data: {
-    attemptId: attempt._id,
-    practiceSessionId: practiceSession?._id ?? null,
-    totalQuestions: attempt.totalQuestions,
-    correctCount: attempt.correctCount,
-    score: attempt.score,
-    accuracy: attempt.accuracy,
-    status: attempt.status,
-    startedAt: attempt.startedAt,
-    submittedAt: attempt.submittedAt,
-  },
-});
-
-} catch (error) {
-console.error("SUBMIT ATTEMPT ERROR:", error);
-
-
-return res.status(500).json({
-  success: false,
-  message: "Failed to submit attempt",
-  data: {},
-});
-
-}
 };
 
 // ======================================================
@@ -538,7 +615,7 @@ const attempt = await Attempt.findOne({
   userId: req.user._id,
 })
   .populate("examId", "name code")
-  .populate("subjectId", "name");
+  .populate("subjectId", "name icon");
 
 if (!attempt) {
   return res.status(404).json({
@@ -548,15 +625,17 @@ if (!attempt) {
   });
 }
 
-// Do not reveal answers before the attempt is completed
-if (attempt.status !== "completed") {
+// Do not reveal answers before the attempt is submitted.
+if (
+  attempt.status !== "completed" &&
+  attempt.status !== "auto-submitted"
+) {
   return res.status(400).json({
     success: false,
     message: "Answer review is only available after submission",
     data: {},
   });
 }
-
 // Fetch the saved answers for this attempt
 const answers = await AttemptAnswer.find({
   attemptId: attempt._id,

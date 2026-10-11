@@ -5,6 +5,7 @@ import Attempt from "../models/Attempt.js";
 import AttemptAnswer from "../models/AttemptAnswer.js";
 import PracticeSession from "../models/PracticeSession.js";
 import User from "../models/User.js";
+import { updateStudyStreak } from "../utils/updateStudyStreak.js";
 
 // ======================================================
 // HELPER: VALIDATE OPTIONAL OBJECTID FILTERS
@@ -245,24 +246,23 @@ const submitPractice = async (req, res) => {
     }
 
     const firstQuestion = questions[0];
+const sameSession = questions.every((question) => {
+  return (
+    question.examId.toString() ===
+      firstQuestion.examId.toString() &&
+    question.subjectId.toString() ===
+      firstQuestion.subjectId.toString()
+  );
+});
 
-    const sameSession = questions.every((question) => {
-      return (
-        question.examId.toString() === firstQuestion.examId.toString() &&
-        question.subjectId.toString() ===
-          firstQuestion.subjectId.toString() &&
-        question.topicId.toString() === firstQuestion.topicId.toString()
-      );
-    });
-
-    if (!sameSession) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "All questions in a practice submission must belong to the same exam, subject and topic",
-        data: {},
-      });
-    }
+if (!sameSession) {
+  return res.status(400).json({
+    success: false,
+    message:
+      "All questions must belong to the same exam and subject",
+    data: {},
+  });
+}
 
     // Calculate scores using correct answers stored in the database.
     let correctCount = 0;
@@ -331,44 +331,66 @@ const submitPractice = async (req, res) => {
     await AttemptAnswer.insertMany(attemptAnswers);
 
     // Create the practice session.
-    const practiceSession = await PracticeSession.create({
-      studentId,
-      topicId: firstQuestion.topicId,
-      numberOfQuestions: totalQuestions,
-      score: correctCount,
-      accuracy,
+ // Calculate performance separately for each topic.
+const topicStats = new Map();
+
+for (const answer of answerResults) {
+  const topicId = answer.topicId.toString();
+
+  if (!topicStats.has(topicId)) {
+    topicStats.set(topicId, {
+      topicId: answer.topicId,
+      numberOfQuestions: 0,
+      correctCount: 0,
     });
+  }
+
+  const stats = topicStats.get(topicId);
+
+  stats.numberOfQuestions += 1;
+
+  if (answer.isCorrect) {
+    stats.correctCount += 1;
+  }
+}
+
+const topicBreakdown = Array.from(topicStats.values());
+
+const topicIds = topicBreakdown.map(
+  (topic) => topic.topicId
+);
+
+const practiceSession = await PracticeSession.create({
+  studentId,
+  subjectId: firstQuestion.subjectId,
+
+  // A single topic is recorded here only when appropriate.
+  topicId:
+    topicIds.length === 1 ? topicIds[0] : null,
+
+  topicIds,
+  topicBreakdown,
+
+  mode: "practice",
+  numberOfQuestions: totalQuestions,
+  score: correctCount,
+  accuracy,
+  durationSeconds: 0,
+});
 
     // Update the student's study streak and question count.
     const user = await User.findById(studentId);
 
-    if (user) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+   
+if (user) {
+  user.questionsAttempted =
+    (user.questionsAttempted || 0) + totalQuestions;
 
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
+  updateStudyStreak(user);
 
-      if (user.lastActiveDate) {
-        const lastActive = new Date(user.lastActiveDate);
-        lastActive.setHours(0, 0, 0, 0);
+  await user.save();
+}
 
-        if (lastActive.getTime() === today.getTime()) {
-          // Already practised today; keep the current streak.
-        } else if (lastActive.getTime() === yesterday.getTime()) {
-          user.studyStreak += 1;
-        } else {
-          user.studyStreak = 1;
-        }
-      } else {
-        user.studyStreak = 1;
-      }
-
-      user.lastActiveDate = new Date();
-      user.questionsAttempted += totalQuestions;
-
-      await user.save();
-    }
 
     return res.status(201).json({
       success: true,

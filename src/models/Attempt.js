@@ -65,16 +65,27 @@ const attemptSchema = new mongoose.Schema(
       max: 100,
     },
 
-    startedAt: {
-      type: Date,
-      required: true,
-      default: Date.now,
-    },
+   startedAt: { 
+    type: Date, 
+    required: true, 
+    default: Date.now
+ },
+submittedAt: {
+     type: Date,
+      default: null
+     },
 
-    submittedAt: {
-      type: Date,
-      default: null,
-    },
+// The duration selected by the student, in minutes.
+durationMinutes: {
+  type: Number,
+  default: null,
+  min: 1,
+},
+durationSeconds: {
+  type: Number,
+  default: 0,
+  min: 0,
+},
   },
   { timestamps: true }
 );

@@ -1,11 +1,12 @@
-import PracticeSession from "../models/PracticeSession.js";
 
+import PracticeSession from "../models/PracticeSession.js";
 
 export const getPracticeSessions = async (req, res) => {
   try {
     const practiceSessions = await PracticeSession.find({
       studentId: req.user._id,
     })
+      .populate("subjectId", "name icon")
       .populate("topicId", "name")
       .sort({ date: -1 });
 
@@ -13,10 +14,28 @@ export const getPracticeSessions = async (req, res) => {
       success: true,
       message: "Practice sessions fetched successfully",
       data: practiceSessions.map((session) => ({
-        topic: session.topicId,
+        _id: session._id,
+
+        subject: session.subjectId
+          ? {
+              _id: session.subjectId._id,
+              name: session.subjectId.name,
+              icon: session.subjectId.icon,
+            }
+          : null,
+
+        topic: session.topicId
+          ? {
+              _id: session.topicId._id,
+              name: session.topicId.name,
+            }
+          : null,
+
+        mode: session.mode,
         numberOfQuestions: session.numberOfQuestions,
         score: session.score,
         accuracy: session.accuracy,
+        durationSeconds: session.durationSeconds,
         date: session.date,
       })),
     });
@@ -26,7 +45,6 @@ export const getPracticeSessions = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch practice sessions",
-      error: error.message,
       data: {},
     });
   }
