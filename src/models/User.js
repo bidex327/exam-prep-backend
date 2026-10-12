@@ -17,6 +17,17 @@ const userSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
+    timezone: {
+  type: String,
+  trim: true,
+  default: "Africa/Lagos",
+},
+
+location: {
+  type: String,
+  trim: true,
+  default: "",
+},
 
    password: {
   type: String,

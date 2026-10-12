@@ -3,7 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import connectDb from "./src/config/db.js";
-
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./src/config/swagger.js";
 import authRoute from "./src/routes/authRoute.js";
 import onboardingRoutes from "./src/routes/onboardingRoutes.js";
 
@@ -18,6 +19,8 @@ import attemptRoutes from "./src/routes/attemptRoutes.js";
 import dashboardRoute from "./src/routes/dashboardRoute.js";
 import practiceRoutes from "./src/routes/practiceRoutes.js";
 import practiceSessionRoutes from "./src/routes/practiceSessionRoutes.js";
+import settingsRoutes from "./src/routes/settingsRoutes.js";
+import bookmarkRoutes from "./src/routes/bookmarkRoutes.js";
 
 dotenv.config();
 
@@ -63,6 +66,7 @@ export const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ======================================================
 // AUTH
@@ -108,7 +112,13 @@ app.use("/api/practice-sessions", practiceSessionRoutes);
 // ======================================================
 
 app.use("/api/dashboard", dashboardRoute);
+app.use("/api/bookmarks", bookmarkRoutes);
 
+// ======================================================
+// SETTINGS
+// ======================================================
+
+app.use("/api/settings", settingsRoutes);
 // ======================================================
 // HOME
 // ======================================================

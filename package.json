@@ -22,7 +22,9 @@
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.10.2",
-    "nodemailer": "^10.0.16"
+    "nodemailer": "^10.0.16",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^1.14.10"
