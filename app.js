@@ -11,6 +11,7 @@ import examRoutes from "./src/routes/examRoutes.js";
 import subjectRoutes from "./src/routes/subjectRoutes.js";
 import topicRoutes from "./src/routes/topicRoutes.js";
 import questionRoutes from "./src/routes/questionRoutes.js";
+import teacherRoutes from "./src/routes/teacherRoutes.js";
 
 import attemptRoutes from "./src/routes/attemptRoutes.js";
 
@@ -82,7 +83,7 @@ app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/exams", examRoutes);
 app.use("/api/subjects", subjectRoutes);
 app.use("/api/topics", topicRoutes);
-
+app.use("/api/teachers", teacherRoutes);
 // ======================================================
 // QUESTION BANK
 // ======================================================
