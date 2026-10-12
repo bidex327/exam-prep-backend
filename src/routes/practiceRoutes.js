@@ -2,9 +2,9 @@ import express from "express";
 
 import {
   getPracticeQuestions,
+  getAvailableYears,
   submitPractice,
 } from "../controllers/practiceController.js";
-
 import protect from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
@@ -21,8 +21,9 @@ const router = express.Router();
 // Example:
 // GET /api/practice?year=2025
 // ======================================================
+router.get("/", protect, getPracticeQuestions);
 
-router.get("/", getPracticeQuestions);
+router.get("/years", protect, getAvailableYears);
 
 // ======================================================
 // SUBMIT PRACTICE

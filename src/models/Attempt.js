@@ -1,69 +1,62 @@
 import mongoose from 'mongoose';
 
-// FOR THE ATTEMPT SCHEMA.
+
 const attemptSchema = new mongoose.Schema(
   {
-    user: {
+    userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    exam: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Exam",
-      required: true,
-      index: true,
-    },
-    subject: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Subject",
+      ref: 'User',
       required: true,
     },
+
+    examId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Exam',
+      required: true,
+    },
+
+    subjectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subject',
+      required: true,
+    },
+
+    questionIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Question',
+        required: true,
+      },
+    ],
+
     mode: {
       type: String,
-      enum: ["practice", "timed-cbt"],
-      default: "practice",
+      enum: ['practice', 'timed-cbt'],
+      default: 'practice',
+    },
+
+    status: {
+      type: String,
+      enum: ['in-progress', 'completed', 'auto-submitted', 'submitted'],
+      default: 'in-progress',
     },
 
     totalQuestions: {
       type: Number,
       required: true,
+      min: 1,
     },
+
     correctCount: {
       type: Number,
       default: 0,
-    },
-    correctPercent: {
-      type: Number,
-      default: 0,
-    },
-
-    question: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Question",
-      required: true,
-    },
-
-    // practiceSession: {
-    //   type: mongoose.Schema.Types.ObjectId,
-    //   ref: "PracticeSession",
-    //   required: true,
-    // },
-    selectedAnswer: {
-      type: String,
-      default: null,
-    },
-    isCorrect: {
-      type: Boolean,
-      required: true,
+      min: 0,
     },
 
     score: {
       type: Number,
       default: null,
       min: 0,
-      max: 100,
     },
 
     accuracy: {
@@ -73,24 +66,35 @@ const attemptSchema = new mongoose.Schema(
       max: 100,
     },
 
-    startedAt: {
-      type: Date,
-      required: true,
-      default: Date.now,
-    },
-    submittedAt: {
-      type: Date,
-      required: true,
-      default: null,
-    },
+   startedAt: { 
+    type: Date, 
+    required: true, 
+    default: Date.now
+ },
+submittedAt: {
+     type: Date,
+      default: null
+     },
 
-    status: {
-      type: String,
-      enum: ["in-progress", "completed", "auto-submitted", "submitted"],
-      default: "in-progress",
-    }
+// The duration selected by the student, in minutes.
+durationMinutes: {
+  type: Number,
+  default: null,
+  min: 1,
+},
+durationSeconds: {
+  type: Number,
+  default: 0,
+  min: 0,
+},
   },
-  { timestamps: true },
+  { timestamps: true }
 );
-attemptSchema.index({ user: 1, subject: 1, createdAt: -1})
-export default mongoose.model("Attempt", attemptSchema)
+
+attemptSchema.index({
+  userId: 1,
+  subjectId: 1,
+  createdAt: -1,
+});
+
+export default mongoose.model('Attempt', attemptSchema);

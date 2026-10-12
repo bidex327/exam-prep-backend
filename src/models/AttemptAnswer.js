@@ -1,41 +1,44 @@
 import mongoose from "mongoose";
 
-export const attemptAnswerSchema = new mongoose.Schema(
+const attemptAnswerSchema = new mongoose.Schema(
   {
-    attempt: {
+    attemptId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Attempt",
       required: true,
+      index: true,
     },
-    question: {
+
+    questionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Question",
       required: true,
+      index: true,
     },
-    topic: {
+
+    topicId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Topic",
       required: true,
-    },
-    selectedOption: {
-      type: String,
-      default: null,
-    },
-    isCorrect: {
-      type: Boolean,
-      required: true,
+      index: true,
     },
 
-    //HOW INDIVIDUAL ANSWER ARE STORED
-    answerTakenStore: {
-      type: Number,
-      default: 0
-    }
+    selectedOption: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
+    isCorrect: {
+      type: Boolean,
+      default: false,
+      required: true,
+    },
   },
   { timestamps: true },
 );
 
-attemptAnswerSchema.index({ attempt: 1 });
-attemptAnswerSchema.index({ question: 1 });
+// A question should only be answered once within one attempt.
+attemptAnswerSchema.index({ attemptId: 1, questionId: 1 }, { unique: true });
 
 export default mongoose.model("AttemptAnswer", attemptAnswerSchema);

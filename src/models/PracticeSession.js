@@ -1,31 +1,25 @@
 import mongoose from "mongoose";
 
-const praticeAnswerSchema = new mongoose.Schema(
+const topicBreakdownSchema = new mongoose.Schema(
   {
-    question: {
+    topicId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Question",
-      require: true
+      ref: "Topic",
+      required: true,
     },
-    selectedAnswer: {
-      type: string,
-      required: true
+    numberOfQuestions: {
+      type: Number,
+      required: true,
+      min: 1,
     },
-    correctAnswer: {
-      type: string,
-      required: true
+    correctCount: {
+      type: Number,
+      required: true,
+      min: 0,
     },
-    isCorrect: {
-      type: Boolean,
-      required: true
-    },
-    answerAt: {
-      type: Date,
-      default: Date.now
-    }
-  }, { _id: true}
-)
-
+  },
+  { _id: false },
+);
 
 const practiceSessionSchema = new mongoose.Schema(
   {
@@ -36,28 +30,41 @@ const practiceSessionSchema = new mongoose.Schema(
       index: true,
     },
 
-    subject: {
+    subjectId: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
-      index: true
-    },
-    
-    topic: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Topic",
+      ref: "Subject",
       required: true,
       index: true,
     },
 
-    question: [
+    // Retained for compatibility with sessions containing one topic.
+    topicId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Topic",
+      default: null,
+      index: true,
+    },
+
+    // All topics covered by this session.
+    topicIds: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Question"
-      }
+        ref: "Topic",
+      },
     ],
 
-    answer: [practiceSessionSchema],
-    
+    // Accurate performance statistics for each individual topic.
+    topicBreakdown: {
+      type: [topicBreakdownSchema],
+      default: [],
+    },
+
+    mode: {
+      type: String,
+      enum: ["practice", "timed-cbt"],
+      required: true,
+    },
+
     numberOfQuestions: {
       type: Number,
       required: true,
@@ -67,66 +74,58 @@ const practiceSessionSchema = new mongoose.Schema(
     correctAnswer: {
       type: Number,
       required: true,
-      default: 0
+      default: 0,
     },
 
     score: {
       type: Number,
-      required: true,
       default: null,
+      min: 0,
+    },
+
+    durationSeconds: {
+      type: Number,
+      default: 0,
       min: 0,
     },
 
     accuracy: {
       type: Number,
-      default: 0,
+      default: null,
       min: 0,
       max: 100,
     },
 
     startedAt: {
       type: Date,
-      default: Date.now
+      default: Date.now,
     },
 
     completedAt: {
       type: Date,
-      default: null
+      default: null,
     },
 
     status: {
       type: String,
-      eunm: [
-        "in_progress","completed"
-      ],
+      eunm: ["in_progress", "completed"],
       default: "in_progress",
-      index: true
-    }
+      index: true,
+    },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true },
 );
 
-// ======================================================
-// CALCULATE ACCURACY BEFORE SAVING
-// ======================================================
-// Accuracy is calculated from the score and the total
-// number of questions.
-//
-// Example:
-// 8 correct out of 10 questions = 80%
-//
-// We calculate this automatically on the backend so the
-// value stored in the database is consistent.
-// ======================================================
-
 practiceSessionSchema.pre("save", function () {
+  if (this.score === null || this.score === undefined) {
+    this.accuracy = null;
+    return;
+  }
+
   this.accuracy =
     this.numberOfQuestions > 0
       ? Math.round((this.score / this.numberOfQuestions) * 100)
-      : 0;
+      : null;
 });
 
-// Export the PracticeSession model.
 export default mongoose.model("PracticeSession", practiceSessionSchema);
