@@ -145,14 +145,16 @@ export const getDashboard = async (req, res) => {
     const studyStreakProgress =
       thisWeekStudyDays.size - lastWeekStudyDays.size;
 
-    // Calculate time spent this week
+
 // Get this student's practice sessions
 const practiceSessions = await PracticeSession.find({
-  studentId: user._id,
+  user: user._id,
 })
   .populate("subjectId", "name icon")
   .populate("topicId", "name icon")
-  .sort({ date: -1 });
+  .sort({ startedAt: -1 });
+
+
 
 // Calculate practice time this week
 const thisWeekTimeSeconds = practiceSessions.reduce(
@@ -171,10 +173,11 @@ const thisWeekTimeSeconds = practiceSessions.reduce(
   0
 );
 
+
 // Calculate practice time last week
 const lastWeekTimeSeconds = practiceSessions.reduce(
   (total, session) => {
-    const sessionDate = new Date(session.date);
+    const sessionDate = new Date(session.startedAt);
 
     if (
       sessionDate >= lastWeekStart &&
@@ -188,6 +191,8 @@ const lastWeekTimeSeconds = practiceSessions.reduce(
   0
 );
 
+
+
 // Convert practice time to minutes
 const thisWeekTimeMinutes = Math.round(
   thisWeekTimeSeconds / 60
@@ -200,21 +205,23 @@ const lastWeekTimeMinutes = Math.round(
 // Calculate practice time progress
 const timeSpentPracticingProgress =
   thisWeekTimeMinutes - lastWeekTimeMinutes;
-      
+
 // Calculate practice-session statistics
 const totalPracticeSessions = practiceSessions.length;
 
+
 const thisWeekPracticeSessions = practiceSessions.filter(
   (session) =>
-    session.date >= thisWeekStart &&
-    session.date <= now
+    session.startedAt >= thisWeekStart &&
+    session.startedAt <= now
 ).length;
 
 const lastWeekPracticeSessions = practiceSessions.filter(
   (session) =>
-    session.date >= lastWeekStart &&
-    session.date <= lastWeekEnd
+    session.startedAt >= lastWeekStart &&
+    session.startedAt <= lastWeekEnd
 ).length;
+
 
 const practiceSessionsProgress =
   thisWeekPracticeSessions - lastWeekPracticeSessions;
@@ -275,7 +282,8 @@ const practiceSessionsProgress =
     const currentSubject = latestAttempt
       ? latestAttempt.subjectId
       : null;
-      
+
+
 // Calculate overall performance for each subject
 const subjectPerformance = await Attempt.aggregate([
   {
@@ -292,38 +300,42 @@ const subjectPerformance = await Attempt.aggregate([
       totalAttempts: { $sum: 1 },
     },
   },
-{
-  $project: {
-    totalQuestions: 1,
-    totalCorrect: 1,
-    accuracy: {
-      $cond: [
-        { $gt: ["$totalQuestions", 0] },
-        {
-          $round: [
-            {
-              $multiply: [
-                {
-                  $divide: [
-                    "$totalCorrect",
-                    "$totalQuestions",
-                  ],
-                },
-                100,
-              ],
-            },
-            0,
-          ],
-        },
-        0,
-      ],
+  {
+    $project: {
+      _id: 0,
+      subjectId: "$_id",
+      totalQuestions: 1,
+      correctAnswers: 1,
+      totalAttempts: 1,
+      accuracy: {
+        $cond: [
+          { $gt: ["$totalQuestions", 0] },
+          {
+            $round: [
+              {
+                $multiply: [
+                  {
+                    $divide: [
+                      "$correctAnswers",
+                      "$totalQuestions",
+                    ],
+                  },
+                  100,
+                ],
+              },
+              0,
+            ],
+          },
+          0,
+        ],
+      },
     },
   },
-},
   {
     $sort: { accuracy: -1 },
   },
 ]);
+
 // Retrieve subject names for the performance results
 const subjectIds = subjectPerformance.map(
   (item) => item.subjectId
@@ -370,7 +382,7 @@ const formattedSubjectPerformance = subjectPerformance.map(
    const topicPerformance = await PracticeSession.aggregate([
   {
     $match: {
-      studentId: new mongoose.Types.ObjectId(
+      user: new mongoose.Types.ObjectId(
         user._id.toString()
       ),
     },
@@ -528,7 +540,7 @@ const formattedSubjectPerformance = subjectPerformance.map(
 
         progressPercentage: thisWeekAccuracy,
 
-       
+
     progress: {
       accuracy: thisWeekAccuracy,
       accuracyProgress,
@@ -584,7 +596,7 @@ weakTopics,
   score: session.score,
   accuracy: session.accuracy,
   durationSeconds: session.durationSeconds,
-  date: session.date,
+date: session.startedAt,
 })),
 
         // Recent activity history

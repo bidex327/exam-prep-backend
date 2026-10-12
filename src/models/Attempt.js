@@ -66,9 +66,9 @@ const attemptSchema = new mongoose.Schema(
       max: 100,
     },
 
-   startedAt: { 
-    type: Date, 
-    required: true, 
+   startedAt: {
+    type: Date,
+    required: true,
     default: Date.now
  },
 submittedAt: {

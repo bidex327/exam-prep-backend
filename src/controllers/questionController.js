@@ -192,6 +192,7 @@ export const getQuestionById = async (req, res) => {
 // CREATE QUESTION
 // ======================================================
 
+
 export const createQuestion = async (req, res) => {
   try {
     const {
@@ -199,12 +200,30 @@ export const createQuestion = async (req, res) => {
       subjectId,
       topicId,
       year,
+      questionType = "multiple-choice",
       questionText,
       options,
       explanation,
     } = req.body;
 
-    // Validate required IDs
+    // Validate required fields
+    if (
+      !examId ||
+      !subjectId ||
+      !topicId ||
+      year === undefined ||
+      !questionText ||
+      !options
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "examId, subjectId, topicId, year, questionText, and options are required",
+        data: {},
+      });
+    }
+
+    // Validate MongoDB IDs
     if (
       !mongoose.isValidObjectId(examId) ||
       !mongoose.isValidObjectId(subjectId) ||
@@ -213,6 +232,73 @@ export const createQuestion = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid examId, subjectId, or topicId",
+        data: {},
+      });
+    }
+
+    // Validate question type
+    if (questionType !== "multiple-choice") {
+      return res.status(400).json({
+        success: false,
+        message: "Unsupported question type",
+        data: {},
+      });
+    }
+
+    // Validate question text
+    if (typeof questionText !== "string" || !questionText.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Question text cannot be empty",
+        data: {},
+      });
+    }
+
+    // Validate year
+    const numericYear = Number(year);
+
+    if (!Number.isInteger(numericYear) || numericYear < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Year must be a valid positive integer",
+        data: {},
+      });
+    }
+
+    // Validate options
+    if (!Array.isArray(options) || options.length < 2 || options.length > 4) {
+      return res.status(400).json({
+        success: false,
+        message: "A question must have between 2 and 4 options",
+        data: {},
+      });
+    }
+
+    if (
+      options.some(
+        (option) =>
+          !option ||
+          typeof option.label !== "string" ||
+          !option.label.trim() ||
+          typeof option.text !== "string" ||
+          !option.text.trim() ||
+          typeof option.isCorrect !== "boolean"
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Every option must have a label, text, and boolean isCorrect value",
+        data: {},
+      });
+    }
+
+    const correctAnswers = options.filter((option) => option.isCorrect);
+
+    if (correctAnswers.length !== 1) {
+      return res.status(400).json({
+        success: false,
+        message: "A question must have exactly one correct answer",
         data: {},
       });
     }
@@ -232,19 +318,20 @@ export const createQuestion = async (req, res) => {
       });
     }
 
-    // createdBy comes from authenticated user
+    // Create question using the authenticated user
     const question = await Question.create({
       examId,
       subjectId,
       topicId,
       createdBy: req.user._id,
-      year,
-      questionText,
+      year: numericYear,
+      questionType,
+      questionText: questionText.trim(),
       options,
       explanation,
     });
 
-    // Do not expose correct answers in response
+    // Hide correct answers in the response
     const safeQuestion = question.toObject();
 
     safeQuestion.options = safeQuestion.options.map((option) => {
@@ -260,6 +347,15 @@ export const createQuestion = async (req, res) => {
   } catch (error) {
     console.error("CREATE QUESTION ERROR:", error);
 
+    // Return useful validation errors
+    if (error.name === "ValidationError" || error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        data: {},
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: "Failed to create question",
@@ -267,6 +363,7 @@ export const createQuestion = async (req, res) => {
     });
   }
 };
+
 
 // ======================================================
 // UPDATE QUESTION

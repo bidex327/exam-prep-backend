@@ -116,7 +116,7 @@ export const startAttempt = async (req, res) => {
 
     // Confirm that the subject exists and belongs to the exam.
     // Confirm that the subject exists and belongs to the exam.
-// Confirm that the subject exists.
+
 const subject = await Subject.findById(subjectId);
 
 if (!subject) {
@@ -126,7 +126,7 @@ if (!subject) {
   });
 }
 
-// Confirm that the subject belongs to the selected exam.
+
 if (subject.examId.toString() !== String(examId)) {
   return res.status(400).json({
     success: false,
@@ -134,18 +134,7 @@ if (subject.examId.toString() !== String(examId)) {
   });
 }
 
-await attempt.save();
 
-await AttemptAnswer.deleteMany({
-  attemptId: attempt._id,
-});
-
-await AttemptAnswer.insertMany(answerRecords);
-await AttemptAnswer.deleteMany({
-  attemptId: attempt._id,
-});
-
-await AttemptAnswer.insertMany(answerRecords);
     // Validate the selected topic when supplied.
     if (topicId) {
       const topic = await Topic.findById(topicId);
@@ -159,7 +148,7 @@ await AttemptAnswer.insertMany(answerRecords);
 
       if (
         topic.subjectId &&
-        topic.subjectId.toString() !== subjectId
+        topic.subjectId.toString() !== String(subjectId)
       ) {
         return res.status(400).json({
           success: false,
@@ -296,10 +285,7 @@ await AttemptAnswer.insertMany(answerRecords);
 };
 
 
-// ============================================
-// SUBMIT ATTEMPT
-// POST /api/attempts/:id/submit
-// ============================================
+
 
 export const submitAttempt = async (req, res) => {
   try {
@@ -532,7 +518,7 @@ export const submitAttempt = async (req, res) => {
       )
     );
 
-    // Save the attempt's final result.
+
     attempt.correctCount = correctCount;
     attempt.score = score;
     attempt.accuracy = accuracy;
@@ -542,15 +528,14 @@ export const submitAttempt = async (req, res) => {
 
     await attempt.save();
 
-    // Remove existing answers for this attempt before inserting the
-    // newly calculated answer records.
+
     await AttemptAnswer.deleteMany({
       attemptId: attempt._id,
     });
 
     await AttemptAnswer.insertMany(answerRecords);
 
-    // Update the user's attempted-question count.
+
     const user = await User.findById(req.user._id);
 
     if (user) {

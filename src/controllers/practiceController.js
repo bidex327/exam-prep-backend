@@ -361,7 +361,7 @@ const topicIds = topicBreakdown.map(
 );
 
 const practiceSession = await PracticeSession.create({
-  studentId,
+  user: studentId,
   subjectId: firstQuestion.subjectId,
 
   // A single topic is recorded here only when appropriate.
@@ -381,7 +381,7 @@ const practiceSession = await PracticeSession.create({
     // Update the student's study streak and question count.
     const user = await User.findById(studentId);
 
-   
+
 if (user) {
   user.questionsAttempted =
     (user.questionsAttempted || 0) + totalQuestions;
