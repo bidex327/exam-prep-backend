@@ -207,7 +207,12 @@ const timeSpentPracticingProgress =
   thisWeekTimeMinutes - lastWeekTimeMinutes;
 
 // Calculate practice-session statistics
-const totalPracticeSessions = practiceSessions.length;
+// Calculate completed practice-session statistics
+const completedPracticeSessions = practiceSessions.filter(
+  (session) => session.status === "completed"
+);
+
+
 
 
 const thisWeekPracticeSessions = practiceSessions.filter(
@@ -526,20 +531,37 @@ const formattedSubjectPerformance = subjectPerformance.map(
       }
     );
 
-    // Build dashboard response
-    return res.status(200).json({
-      success: true,
-      message: "Dashboard fetched successfully",
-      data: {
-        student: user.fullName,
-        targetExam: user.targetExam,
-        selectedSubjects: user.selectedSubjects,
 
-        questionsAttempted: user.questionsAttempted,
-        studyStreak: user.studyStreak,
 
-        progressPercentage: thisWeekAccuracy,
+const recentActivities = practiceSessions
+  .filter((session) => session.status === "completed")
+  .slice(0, 5)
+  .map((session) => ({
+    icon: session.subjectId?.icon || "book-open",
+    subject: session.subjectId?.name || "Unknown subject",
+    topic:
+      session.topicId?.name ||
+      (session.topicIds?.length ? "Multiple topics" : null),
+    questions: session.numberOfQuestions,
+    score: session.score ?? null,
+    date: session.completedAt ?? session.startedAt ?? null,
+  }));
 
+// Build dashboard response
+return res.status(200).json({
+  success: true,
+  message: "Dashboard fetched successfully",
+  data: {
+    student: user.fullName,
+    targetExam: user.targetExam,
+    selectedSubjects: user.selectedSubjects,
+    questionsAttempted: user.questionsAttempted,
+
+    studyStreak: user.studyStreak,
+    practiceSessionsCompleted,
+    recentActivities,
+
+    progressPercentage: thisWeekAccuracy,
 
     progress: {
       accuracy: thisWeekAccuracy,
@@ -551,15 +573,16 @@ const formattedSubjectPerformance = subjectPerformance.map(
       studyStreak: user.studyStreak,
       studyStreakProgress,
 
+      practiceSessionsCompleted,
       timeSpentPracticing: thisWeekTimeMinutes,
       timeSpentPracticingProgress,
-
       practiceSessions: thisWeekPracticeSessions,
       practiceSessionsProgress,
       totalPracticeSessions,
 
       date: now.toISOString().split("T")[0],
     },
+
 
 
 
@@ -572,31 +595,24 @@ subjectPerformance: formattedSubjectPerformance,
 // Topics with combined accuracy below 50%
 weakTopics,
 
-      practiceSessions: practiceSessions.map((session) => ({
-  _id: session._id,
+ practiceSessions: practiceSessions.map((session) => ({
+  sessionId: session._id,
 
   subject: session.subjectId
-    ? {
-        _id: session.subjectId._id,
-        name: session.subjectId.name,
-        icon: session.subjectId.icon,
-      }
+    ? session.subjectId.name
     : null,
 
   topic: session.topicId
-    ? {
-        _id: session.topicId._id,
-        name: session.topicId.name,
-        icon: session.topicId.icon,
-      }
+    ? session.topicId.name
     : null,
 
-  mode: session.mode,
+  practiceMode: session.mode,
   numberOfQuestions: session.numberOfQuestions,
+
   score: session.score,
   accuracy: session.accuracy,
   durationSeconds: session.durationSeconds,
-date: session.startedAt,
+  date: session.startedAt,
 })),
 
         // Recent activity history
