@@ -360,13 +360,13 @@ const topicIds = topicBreakdown.map(
   (topic) => topic.topicId
 );
 
+
 const practiceSession = await PracticeSession.create({
   user: studentId,
   subjectId: firstQuestion.subjectId,
 
-  // A single topic is recorded here only when appropriate.
-  topicId:
-    topicIds.length === 1 ? topicIds[0] : null,
+  // Record a topic here only if all questions share one topic.
+  topicId: topicIds.length === 1 ? topicIds[0] : null,
 
   topicIds,
   topicBreakdown,
@@ -376,7 +376,12 @@ const practiceSession = await PracticeSession.create({
   score: correctCount,
   accuracy,
   durationSeconds: 0,
+
+  // Submission means the practice session is complete.
+  status: "completed",
+  completedAt: new Date(),
 });
+
 
     // Update the student's study streak and question count.
     const user = await User.findById(studentId);

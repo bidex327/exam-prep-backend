@@ -155,7 +155,11 @@ const practiceSessions = await PracticeSession.find({
   .sort({ startedAt: -1 });
 
 
+const completedPracticeSessions = practiceSessions.filter(
+  (session) => session.status === "completed"
+);
 
+const practiceSessionsCompleted = completedPracticeSessions.length;
 // Calculate practice time this week
 const thisWeekTimeSeconds = practiceSessions.reduce(
   (total, session) => {
@@ -205,12 +209,6 @@ const lastWeekTimeMinutes = Math.round(
 // Calculate practice time progress
 const timeSpentPracticingProgress =
   thisWeekTimeMinutes - lastWeekTimeMinutes;
-
-// Calculate practice-session statistics
-// Calculate completed practice-session statistics
-const completedPracticeSessions = practiceSessions.filter(
-  (session) => session.status === "completed"
-);
 
 
 
@@ -578,7 +576,7 @@ return res.status(200).json({
       timeSpentPracticingProgress,
       practiceSessions: thisWeekPracticeSessions,
       practiceSessionsProgress,
-      totalPracticeSessions,
+
 
       date: now.toISOString().split("T")[0],
     },
