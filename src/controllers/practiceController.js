@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 import Question from "../models/question.js";
 import Attempt from "../models/Attempt.js";
@@ -7,10 +6,7 @@ import PracticeSession from "../models/PracticeSession.js";
 import User from "../models/User.js";
 import { updateStudyStreak } from "../utils/updateStreak.js";
 
-// ======================================================
-// HELPER: VALIDATE OPTIONAL OBJECTID FILTERS
-// ======================================================
-
+// Validate optional MongoDB ObjectId filters.
 const validateObjectIdFilter = (value, fieldName, filter) => {
   if (value === undefined) {
     return null;
@@ -28,31 +24,21 @@ const validateObjectIdFilter = (value, fieldName, filter) => {
   }
 
   filter[fieldName] = new mongoose.Types.ObjectId(value);
-
   return null;
 };
 
-// ======================================================
-// GET PRACTICE QUESTIONS
-// ======================================================
-
+// GET /api/practice
 const getPracticeQuestions = async (req, res) => {
   try {
     const { examId, subjectId, topicId, year } = req.query;
-
     const filter = {};
 
-    // Validate each optional ID filter.
-    const idFilters = [
+    for (const [fieldName, value] of [
       ["examId", examId],
       ["subjectId", subjectId],
       ["topicId", topicId],
-    ];
-
-    for (const [fieldName, value] of idFilters) {
-      if (value === undefined) {
-        continue;
-      }
+    ]) {
+      if (value === undefined) continue;
 
       const validationError = validateObjectIdFilter(
         value,
@@ -65,7 +51,6 @@ const getPracticeQuestions = async (req, res) => {
       }
     }
 
-    // Validate year when supplied.
     if (year !== undefined) {
       const currentYear = new Date().getFullYear();
 
@@ -88,7 +73,7 @@ const getPracticeQuestions = async (req, res) => {
 
     const questions = await Question.find(filter).lean();
 
-    // Never reveal correct answers or explanations during practice.
+    // Never expose correct answers or explanations during practice.
     const practiceQuestions = questions.map((question) => {
       const { explanation, ...safeQuestion } = question;
 
@@ -116,26 +101,18 @@ const getPracticeQuestions = async (req, res) => {
   }
 };
 
-// ======================================================
-// GET AVAILABLE YEARS
-// ======================================================
-
+// GET /api/practice/years
 const getAvailableYears = async (req, res) => {
   try {
     const { examId, subjectId, topicId } = req.query;
-
     const filter = {};
 
-    const idFilters = [
+    for (const [fieldName, value] of [
       ["examId", examId],
       ["subjectId", subjectId],
       ["topicId", topicId],
-    ];
-
-    for (const [fieldName, value] of idFilters) {
-      if (value === undefined) {
-        continue;
-      }
+    ]) {
+      if (value === undefined) continue;
 
       const validationError = validateObjectIdFilter(
         value,
@@ -170,14 +147,11 @@ const getAvailableYears = async (req, res) => {
   }
 };
 
-// ======================================================
-// SUBMIT PRACTICE
-// ======================================================
-
+// POST /api/practice/submit
 const submitPractice = async (req, res) => {
   try {
     const studentId = req.user._id;
-    const { answers } = req.body;
+    const { answers, startedAt } = req.body;
 
     if (!Array.isArray(answers) || answers.length === 0) {
       return res.status(400).json({
@@ -187,15 +161,50 @@ const submitPractice = async (req, res) => {
       });
     }
 
-    const questionIds = answers.map((answer) => answer?.questionId);
+    // Calculate the actual elapsed practice duration.
+    // The frontend should send startedAt when the session begins.
+    const submittedAt = new Date();
+    let durationSeconds = 0;
 
-    const invalidQuestionId = questionIds.some(
-      (questionId) =>
-        typeof questionId !== "string" ||
-        !mongoose.Types.ObjectId.isValid(questionId)
+    if (startedAt !== undefined) {
+      if (typeof startedAt !== "string") {
+        return res.status(400).json({
+          success: false,
+          message: "startedAt must be a valid date string",
+          data: {},
+        });
+      }
+
+      const startTime = new Date(startedAt);
+
+      if (
+        Number.isNaN(startTime.getTime()) ||
+        startTime > submittedAt
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid practice session start time",
+          data: {},
+        });
+      }
+
+      durationSeconds = Math.floor(
+        (submittedAt.getTime() - startTime.getTime()) / 1000
+      );
+    }
+
+    // Validate question IDs.
+    const questionIds = answers.map(
+      (answer) => answer?.questionId
     );
 
-    if (invalidQuestionId) {
+    if (
+      questionIds.some(
+        (id) =>
+          typeof id !== "string" ||
+          !mongoose.Types.ObjectId.isValid(id)
+      )
+    ) {
       return res.status(400).json({
         success: false,
         message: "One or more question IDs are invalid",
@@ -203,13 +212,11 @@ const submitPractice = async (req, res) => {
       });
     }
 
-    // Prevent duplicate question IDs in one submission.
-    const normalizedQuestionIds = questionIds.map((id) => id.toLowerCase());
+    const normalizedIds = questionIds.map((id) =>
+      id.toLowerCase()
+    );
 
-    if (
-      new Set(normalizedQuestionIds).size !==
-      normalizedQuestionIds.length
-    ) {
+    if (new Set(normalizedIds).size !== normalizedIds.length) {
       return res.status(400).json({
         success: false,
         message: "Duplicate question IDs are not allowed",
@@ -217,15 +224,15 @@ const submitPractice = async (req, res) => {
       });
     }
 
-    // Validate selected options before accessing the database.
-    const invalidSelectedOption = answers.some(
-      (answer) =>
-        answer.selectedOption !== undefined &&
-        answer.selectedOption !== null &&
-        typeof answer.selectedOption !== "string"
-    );
-
-    if (invalidSelectedOption) {
+    // Validate selected options.
+    if (
+      answers.some(
+        (answer) =>
+          answer.selectedOption !== undefined &&
+          answer.selectedOption !== null &&
+          typeof answer.selectedOption !== "string"
+      )
+    ) {
       return res.status(400).json({
         success: false,
         message: "Selected options must be strings",
@@ -233,6 +240,7 @@ const submitPractice = async (req, res) => {
       });
     }
 
+    // Retrieve the submitted questions.
     const questions = await Question.find({
       _id: { $in: questionIds },
     });
@@ -246,25 +254,26 @@ const submitPractice = async (req, res) => {
     }
 
     const firstQuestion = questions[0];
-const sameSession = questions.every((question) => {
-  return (
-    question.examId.toString() ===
-      firstQuestion.examId.toString() &&
-    question.subjectId.toString() ===
-      firstQuestion.subjectId.toString()
-  );
-});
 
-if (!sameSession) {
-  return res.status(400).json({
-    success: false,
-    message:
-      "All questions must belong to the same exam and subject",
-    data: {},
-  });
-}
+    // All questions must belong to the same exam and subject.
+    const sameSession = questions.every(
+      (question) =>
+        question.examId.toString() ===
+          firstQuestion.examId.toString() &&
+        question.subjectId.toString() ===
+          firstQuestion.subjectId.toString()
+    );
 
-    // Calculate scores using correct answers stored in the database.
+    if (!sameSession) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "All questions must belong to the same exam and subject",
+        data: {},
+      });
+    }
+
+    // Mark submitted answers and calculate the score.
     let correctCount = 0;
     const answerResults = [];
 
@@ -280,7 +289,6 @@ if (!sameSession) {
 
       const selectedOption = submittedAnswer.selectedOption;
 
-      // Match the submitted option against the stored option label.
       const isCorrect = Boolean(
         correctOption &&
           selectedOption === correctOption.label
@@ -304,7 +312,7 @@ if (!sameSession) {
       (correctCount / totalQuestions) * 100
     );
 
-    // Create the completed attempt.
+    // Save the completed attempt.
     const attempt = await Attempt.create({
       userId: studentId,
       examId: firstQuestion.examId,
@@ -316,81 +324,88 @@ if (!sameSession) {
       correctCount,
       score: correctCount,
       accuracy,
-      submittedAt: new Date(),
+      submittedAt,
     });
 
-    // Save the answers for this attempt.
-    const attemptAnswers = answerResults.map((answer) => ({
-      attemptId: attempt._id,
-      questionId: answer.questionId,
-      topicId: answer.topicId,
-      selectedOption: answer.selectedOption,
-      isCorrect: answer.isCorrect,
-    }));
+    // Save each submitted answer.
+    await AttemptAnswer.insertMany(
+      answerResults.map((answer) => ({
+        attemptId: attempt._id,
+        questionId: answer.questionId,
+        topicId: answer.topicId,
+        selectedOption: answer.selectedOption,
+        isCorrect: answer.isCorrect,
+      }))
+    );
 
-    await AttemptAnswer.insertMany(attemptAnswers);
+    // Aggregate results for each topic.
+    const topicStats = new Map();
 
-    // Create the practice session.
- // Calculate performance separately for each topic.
-const topicStats = new Map();
+    for (const answer of answerResults) {
+      if (!answer.topicId) {
+        throw new Error(
+          `Question ${answer.questionId} has no topicId`
+        );
+      }
 
-for (const answer of answerResults) {
-  const topicId = answer.topicId.toString();
+      const topicId = answer.topicId.toString();
 
-  if (!topicStats.has(topicId)) {
-    topicStats.set(topicId, {
-      topicId: answer.topicId,
-      numberOfQuestions: 0,
-      correctCount: 0,
+      if (!topicStats.has(topicId)) {
+        topicStats.set(topicId, {
+          topicId: answer.topicId,
+          numberOfQuestions: 0,
+          correctCount: 0,
+        });
+      }
+
+      const stats = topicStats.get(topicId);
+      stats.numberOfQuestions++;
+
+      if (answer.isCorrect) {
+        stats.correctCount++;
+      }
+    }
+
+    const topicBreakdown = Array.from(
+      topicStats.values()
+    );
+
+    const topicIds = topicBreakdown.map(
+      (topic) => topic.topicId
+    );
+
+    // Save the practice session.
+    // The schema uses "user" as its owner field.
+    const practiceSession = await PracticeSession.create({
+      user: studentId,
+      subjectId: firstQuestion.subjectId,
+      topicId:
+        topicIds.length === 1 ? topicIds[0] : null,
+      topicIds,
+      topicBreakdown,
+      mode: "practice",
+      numberOfQuestions: totalQuestions,
+      correctAnswer: correctCount,
+      score: correctCount,
+      accuracy,
+      durationSeconds,
+      status: "completed",
+      startedAt: startedAt
+        ? new Date(startedAt)
+        : submittedAt,
+      completedAt: submittedAt,
     });
-  }
 
-  const stats = topicStats.get(topicId);
-
-  stats.numberOfQuestions += 1;
-
-  if (answer.isCorrect) {
-    stats.correctCount += 1;
-  }
-}
-
-const topicBreakdown = Array.from(topicStats.values());
-
-const topicIds = topicBreakdown.map(
-  (topic) => topic.topicId
-);
-
-const practiceSession = await PracticeSession.create({
-  studentId,
-  subjectId: firstQuestion.subjectId,
-
-  // A single topic is recorded here only when appropriate.
-  topicId:
-    topicIds.length === 1 ? topicIds[0] : null,
-
-  topicIds,
-  topicBreakdown,
-
-  mode: "practice",
-  numberOfQuestions: totalQuestions,
-  score: correctCount,
-  accuracy,
-  durationSeconds: 0,
-});
-
-    // Update the student's study streak and question count.
+    // Update the user's practice statistics.
     const user = await User.findById(studentId);
 
-   
-if (user) {
-  user.questionsAttempted =
-    (user.questionsAttempted || 0) + totalQuestions;
+    if (user) {
+      user.questionsAttempted =
+        (user.questionsAttempted || 0) + totalQuestions;
 
-  updateStudyStreak(user);
-
-  await user.save();
-}
-
+      updateStudyStreak(user);
+      await user.save();
+    }
 
     return res.status(201).json({
       success: true,
@@ -401,6 +416,7 @@ if (user) {
         totalQuestions,
         correctCount,
         accuracy,
+        durationSeconds,
       },
     });
   } catch (error) {
@@ -408,16 +424,14 @@ if (user) {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to submit practice",
+      message:
+        error.message || "Failed to submit practice",
       data: {},
     });
   }
 };
 
-// ======================================================
-// EXPORT CONTROLLERS
-// ======================================================
-
+// Export all controllers used by practiceRoutes.js.
 export {
   getPracticeQuestions,
   getAvailableYears,
