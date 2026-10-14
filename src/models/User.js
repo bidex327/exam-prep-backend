@@ -9,6 +9,13 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    profilePicture: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+
     emailOrPhone: {
       type: String,
       required: true,

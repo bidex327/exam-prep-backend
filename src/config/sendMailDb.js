@@ -7,21 +7,35 @@ const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
   secure: true,
+  requireTLS: true,
+  family: 4,
+
+  tls: {
+    minVersion: "TLSv1.2",
+    rejectUnauthorized: false,
+  },
+
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  tls:{
-    rejectUnauthorized:false
-  }
 });
+
+transporter
+  .verify()
+  .then(() => {
+    console.log("Email server is ready");
+  })
+  .catch((error) => {
+    console.error("Email server error:", error.message);
+  });
 
 export const sendMail = async ({ to, subject, html }) => {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     throw new Error("Email configuration is missing");
   }
 
-  await transporter.sendMail({
+  return transporter.sendMail({
     from: `"ExamPrep NG" <${process.env.EMAIL_USER}>`,
     to,
     subject,

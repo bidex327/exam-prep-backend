@@ -13,8 +13,10 @@ import subjectRoutes from "./src/routes/subjectRoutes.js";
 import topicRoutes from "./src/routes/topicRoutes.js";
 import questionRoutes from "./src/routes/questionRoutes.js";
 import teacherRoutes from "./src/routes/teacherRoutes.js";
+import adminRoutes from "./src/routes/adminRoutes.js";
 
 import attemptRoutes from "./src/routes/attemptRoutes.js";
+import notificationRoutes from "./src/routes/notificationRoutes.js";
 
 import dashboardRoute from "./src/routes/dashboardRoute.js";
 import practiceRoutes from "./src/routes/practiceRoutes.js";
@@ -38,12 +40,12 @@ connectDb();
 
 const allowedOrigins = [
   process.env.CLIENT_URL,
+  "http://localhost:4000",
   "http://localhost:5500",
   "http://127.0.0.1:5500",
   "https://snack-runtime.eascdn.net",
   "https://snack.expo.dev",
 ].filter(Boolean);
-
 export const corsOptions = {
   origin(origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -77,6 +79,7 @@ app.use("/api/auth", authRoute);
 // ======================================================
 // ONBOARDING
 // ======================================================
+app.use("/api/admin", adminRoutes);
 
 app.use("/api/onboarding", onboardingRoutes);
 
@@ -94,6 +97,7 @@ app.use("/api/teachers", teacherRoutes);
 
 app.use("/api/questions", questionRoutes);
 
+app.use("/api/notifications", notificationRoutes);
 // ======================================================
 // ASSESSMENT
 // ======================================================
