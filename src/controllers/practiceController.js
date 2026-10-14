@@ -263,8 +263,7 @@ const submitPractice = async (req, res) => {
         question.subjectId.toString() ===
           firstQuestion.subjectId.toString()
     );
-
-    if (!sameSession) {
+ if (!sameSession) {
       return res.status(400).json({
         success: false,
         message:
@@ -273,11 +272,38 @@ const submitPractice = async (req, res) => {
       });
     }
 
+    // Reject selected option labels that do not exist for their question.
+    for (const submittedAnswer of answers) {
+      const question = questions.find(
+        (item) =>
+          item._id.toString() === submittedAnswer.questionId
+      );
+
+      const selectedOption = submittedAnswer.selectedOption;
+
+      // Allow unanswered questions.
+      if (selectedOption === undefined || selectedOption === null) {
+        continue;
+      }
+
+      const optionExists = question.options.some(
+        (option) => option.label === selectedOption
+      );
+
+      if (!optionExists) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid selected option for question ${submittedAnswer.questionId}`,
+          data: {},
+        });
+      }
+    }
+
     // Mark submitted answers and calculate the score.
     let correctCount = 0;
     const answerResults = [];
 
-    for (const submittedAnswer of answers) {
+ for (const submittedAnswer of answers) {
       const question = questions.find(
         (item) =>
           item._id.toString() === submittedAnswer.questionId

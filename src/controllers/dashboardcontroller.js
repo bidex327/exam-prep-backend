@@ -161,11 +161,15 @@ const completedPracticeSessions = practiceSessions.filter(
 
 const practiceSessionsCompleted = completedPracticeSessions.length;
 // Calculate practice time this week
-const thisWeekTimeSeconds = practiceSessions.reduce(
+// Calculate completed practice time this week
+const thisWeekTimeSeconds = completedPracticeSessions.reduce(
   (total, session) => {
-    const sessionDate = new Date(session.date);
+    const sessionDate = new Date(
+      session.completedAt || session.startedAt
+    );
 
     if (
+      !Number.isNaN(sessionDate.getTime()) &&
       sessionDate >= thisWeekStart &&
       sessionDate <= now
     ) {
@@ -178,12 +182,16 @@ const thisWeekTimeSeconds = practiceSessions.reduce(
 );
 
 
-// Calculate practice time last week
-const lastWeekTimeSeconds = practiceSessions.reduce(
+
+// Calculate completed practice time last week.
+const lastWeekTimeSeconds = completedPracticeSessions.reduce(
   (total, session) => {
-    const sessionDate = new Date(session.startedAt);
+    const sessionDate = new Date(
+      session.completedAt || session.startedAt
+    );
 
     if (
+      !Number.isNaN(sessionDate.getTime()) &&
       sessionDate >= lastWeekStart &&
       sessionDate <= lastWeekEnd
     ) {
@@ -194,6 +202,7 @@ const lastWeekTimeSeconds = practiceSessions.reduce(
   },
   0
 );
+
 
 
 
@@ -211,23 +220,37 @@ const timeSpentPracticingProgress =
   thisWeekTimeMinutes - lastWeekTimeMinutes;
 
 
+const thisWeekPracticeSessions = completedPracticeSessions.filter(
+  (session) => {
+    const sessionDate = new Date(
+      session.completedAt || session.startedAt
+    );
 
-
-const thisWeekPracticeSessions = practiceSessions.filter(
-  (session) =>
-    session.startedAt >= thisWeekStart &&
-    session.startedAt <= now
+    return (
+      !Number.isNaN(sessionDate.getTime()) &&
+      sessionDate >= thisWeekStart &&
+      sessionDate <= now
+    );
+  }
 ).length;
 
-const lastWeekPracticeSessions = practiceSessions.filter(
-  (session) =>
-    session.startedAt >= lastWeekStart &&
-    session.startedAt <= lastWeekEnd
-).length;
+const lastWeekPracticeSessions = completedPracticeSessions.filter(
+  (session) => {
+    const sessionDate = new Date(
+      session.completedAt || session.startedAt
+    );
 
+    return (
+      !Number.isNaN(sessionDate.getTime()) &&
+      sessionDate >= lastWeekStart &&
+      sessionDate <= lastWeekEnd
+    );
+  }
+).length;
 
 const practiceSessionsProgress =
   thisWeekPracticeSessions - lastWeekPracticeSessions;
+
 
 
     // Get the most recent practice session
@@ -484,7 +507,7 @@ const formattedSubjectPerformance = subjectPerformance.map(
   // A weak topic is one with combined accuracy below 50%.
   {
     $match: {
-      accuracy: { $lt: 50 },
+    accuracy: { $lte: 50 },
     },
   },
 
@@ -549,11 +572,13 @@ const recentActivities = practiceSessions
 return res.status(200).json({
   success: true,
   message: "Dashboard fetched successfully",
-  data: {
-    student: user.fullName,
-    targetExam: user.targetExam,
-    selectedSubjects: user.selectedSubjects,
-    questionsAttempted: user.questionsAttempted,
+data: {
+  student: user.fullName,
+  profilePicture: user.profilePicture || "",
+  targetExam: user.targetExam,
+  selectedSubjects: user.selectedSubjects,
+  questionsAttempted: user.questionsAttempted,
+
 
     studyStreak: user.studyStreak,
     practiceSessionsCompleted,

@@ -5,7 +5,7 @@ import User from "../models/User.js";
 export const getSettings = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select(
-      "fullName emailOrPhone timezone location emailVerified"
+       "fullName emailOrPhone profilePicture timezone location emailVerified createdAt"
     );
 
     if (!user) {
@@ -18,13 +18,15 @@ export const getSettings = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Settings retrieved successfully.",
-      data: {
-        fullName: user.fullName,
-        email: user.emailOrPhone,
-        timezone: user.timezone || "Africa/Lagos",
-        location: user.location || "",
-        emailVerified: user.emailVerified,
-      },
+    data: {
+  fullName: user.fullName,
+  email: user.emailOrPhone,
+  profilePicture: user.profilePicture || "",
+  timezone: user.timezone || "Africa/Lagos",
+  location: user.location || "",
+  emailVerified: user.emailVerified,
+  createdAt: user.createdAt,
+},
     });
   } catch (error) {
     console.error("Get settings error:", error);
@@ -40,21 +42,9 @@ export const getSettings = async (req, res) => {
 // Update permitted profile fields.
 export const updateSettings = async (req, res) => {
   try {
-    const { fullName, timezone, location } = req.body;
+    const { timezone, location } = req.body;
 
     const updates = {};
-
-    if (fullName !== undefined) {
-      if (typeof fullName !== "string" || !fullName.trim()) {
-        return res.status(400).json({
-          success: false,
-          message: "Full name must be a non-empty string.",
-        });
-      }
-
-      updates.fullName = fullName.trim();
-    }
-
     if (timezone !== undefined) {
       if (typeof timezone !== "string" || !timezone.trim()) {
         return res.status(400).json({
@@ -84,14 +74,15 @@ export const updateSettings = async (req, res) => {
       });
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { $set: updates },
-      {
-        returnDocument: after,
-        runValidators: true,
-      }
-    ).select("fullName emailOrPhone timezone location emailVerified");
+
+const user = await User.findByIdAndUpdate(
+  req.user._id,
+  { $set: updates },
+  {
+    returnDocument: "after",
+    runValidators: true,
+  }
+).select("fullName emailOrPhone profilePicture timezone location emailVerified createdAt");
 
     if (!user) {
       return res.status(404).json({
@@ -109,6 +100,8 @@ export const updateSettings = async (req, res) => {
         timezone: user.timezone || "Africa/Lagos",
         location: user.location || "",
         emailVerified: user.emailVerified,
+        profilePicture: user.profilePicture || "",
+       createdAt: user.createdAt,
       },
     });
   } catch (error) {
@@ -117,6 +110,62 @@ export const updateSettings = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to update settings.",
+    });
+  }
+};
+
+
+// POST /api/settings/profile-picture
+export const uploadProfilePicture = async (req, res) => {
+  try {
+    if (!req.file || !req.file.path) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select a profile picture to upload.",
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          profilePicture: req.file.path,
+        },
+      },
+      {
+        returnDocument: "after",
+        runValidators: true,
+      }
+    ).select(
+      "fullName emailOrPhone profilePicture timezone location emailVerified createdAt"
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile picture uploaded successfully.",
+      data: {
+        profilePicture: user.profilePicture,
+        fullName: user.fullName,
+        email: user.emailOrPhone,
+        timezone: user.timezone || "Africa/Lagos",
+        location: user.location || "",
+        emailVerified: user.emailVerified,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error("Profile picture upload error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to upload profile picture.",
     });
   }
 };
