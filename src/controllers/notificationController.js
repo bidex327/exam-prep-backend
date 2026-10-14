@@ -1,6 +1,6 @@
 
 import mongoose from "mongoose";
-import Notification from "../models/Notification.js";
+import Notification from "../models/notification.js";
 
 // GET /api/notifications
 export const getNotifications = async (req, res) => {
