@@ -1,13 +1,19 @@
+
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 
 dotenv.config();
 
+// Temporary diagnostic: confirms whether Vercel has both variables.
+console.log("Email environment check:", {
+  EMAIL_USER_SET: Boolean(process.env.EMAIL_USER),
+  EMAIL_PASS_SET: Boolean(process.env.EMAIL_PASS),
+});
+
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
   secure: true,
-  requireTLS: true,
   family: 4,
 
   tls: {
