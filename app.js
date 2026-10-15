@@ -45,6 +45,8 @@ const allowedOrigins = [
   "http://127.0.0.1:5500",
   "https://snack-runtime.eascdn.net",
   "https://snack.expo.dev",
+  "http://localhost:8081",
+  "http://localhost:8082",
 ].filter(Boolean);
 export const corsOptions = {
   origin(origin, callback) {
@@ -57,7 +59,7 @@ export const corsOptions = {
 
   credentials: true,
 
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 
   allowedHeaders: ["Content-Type", "Authorization"],
 };

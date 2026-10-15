@@ -1,6 +1,7 @@
 
 import mongoose from "mongoose";
 import Notification from "../models/notification.js";
+import { createNotification } from "../services/notificationService.js";
 
 // GET /api/notifications
 export const getNotifications = async (req, res) => {
@@ -105,6 +106,37 @@ export const markAllNotificationsAsRead = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to update notifications",
+      data: {},
+    });
+  }
+};
+
+export const createTestNotification = async (req, res) => {
+  try {
+    const notification = await createNotification({
+      userId: req.user._id,
+      title: "Practice Reminder",
+      description: "Continue practising your selected subject.",
+      type: "reminder",
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Test notification created successfully",
+      data: {
+        id: notification._id,
+        title: notification.title,
+        description: notification.description,
+        type: notification.type,
+        isRead: notification.isRead,
+      },
+    });
+  } catch (error) {
+    console.error("CREATE TEST NOTIFICATION ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create test notification",
       data: {},
     });
   }
