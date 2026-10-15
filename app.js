@@ -43,6 +43,7 @@ const allowedOrigins = [
   "http://localhost:4000",
   "http://localhost:5500",
   "http://127.0.0.1:5500",
+ " https://examprep-ng-frontend.vercel.app",
   "https://snack-runtime.eascdn.net",
   "https://snack.expo.dev",
   "http://localhost:8081",
