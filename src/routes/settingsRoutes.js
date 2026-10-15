@@ -3,7 +3,8 @@ import protect from "../middlewares/authMiddleware.js";
 import {
   getSettings,
   updateSettings,
-  uploadProfilePicture
+  uploadProfilePicture,
+  removeProfilePicture
 } from "../controllers/settingsController.js";
 import upload from "../middlewares/uploadProfilePicture.js";
 
@@ -52,6 +53,10 @@ router.get("/", protect, getSettings);
  *         description: Authentication required
  */
 router.put("/", protect, updateSettings);
+
+
+router.delete("/profile-picture", protect, removeProfilePicture);
+
 
 
 

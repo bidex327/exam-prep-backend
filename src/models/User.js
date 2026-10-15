@@ -14,7 +14,11 @@ const userSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
-
+    profilePicturePublicId: {
+  type: String,
+  default: "",
+  trim: true,
+},
 
     emailOrPhone: {
       type: String,
