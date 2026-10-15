@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import cloudinary from "../config/cloudinary.js";
 
 // GET /api/settings
 // Retrieve the authenticated user's settings.
@@ -128,9 +129,10 @@ export const uploadProfilePicture = async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.user._id,
       {
-        $set: {
-          profilePicture: req.file.path,
-        },
+       $set: {
+  profilePicture: req.file.path,
+  profilePicturePublicId: req.file.filename,
+},
       },
       {
         returnDocument: "after",
@@ -166,6 +168,102 @@ export const uploadProfilePicture = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to upload profile picture.",
+    });
+  }
+};
+
+
+
+// DELETE /api/settings/profile-picture
+export const removeProfilePicture = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // No picture to remove.
+    if (!user.profilePicture) {
+      return res.status(200).json({
+        success: true,
+        message: "No profile picture to remove.",
+        data: { profilePicture: "" },
+      });
+    }
+
+    // Use the saved public ID when available.
+    let publicId = user.profilePicturePublicId;
+
+    // Support pictures uploaded before the public ID field existed.
+    if (!publicId) {
+      try {
+        const pathname = new URL(user.profilePicture).pathname;
+        const uploadIndex = pathname.indexOf("/upload/");
+
+        if (uploadIndex !== -1) {
+          const parts = pathname
+            .slice(uploadIndex + "/upload/".length)
+            .split("/");
+
+          const versionIndex = parts.findIndex((part) =>
+            /^v\d+$/.test(part)
+          );
+
+          if (versionIndex !== -1) {
+            publicId = parts
+              .slice(versionIndex + 1)
+              .join("/")
+              .replace(/\.[^/.]+$/, "");
+          }
+        }
+      } catch {
+        publicId = "";
+      }
+    }
+
+    // Never clear the database if we cannot identify the Cloudinary image.
+    if (!publicId) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "Could not identify the stored profile picture. Please contact support.",
+      });
+    }
+
+    // Delete the image from Cloudinary first.
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: "image",
+    });
+
+    if (!["ok", "not found"].includes(result.result)) {
+      return res.status(502).json({
+        success: false,
+        message: "Could not remove the profile picture from storage.",
+      });
+    }
+
+    // Clear the image information in MongoDB.
+    user.profilePicture = "";
+    user.profilePicturePublicId = "";
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile picture removed successfully.",
+      data: {
+        profilePicture: "",
+      },
+    });
+  } catch (error) {
+    console.error("Profile picture removal error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to remove profile picture.",
     });
   }
 };
