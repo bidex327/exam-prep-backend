@@ -120,7 +120,10 @@ export const getAdminDashboard = async (req, res) => {
       examCode: question.examId?.code || null,
       subject: question.subjectId?.name || "Unknown subject",
       topic: question.topicId?.name || "Unknown topic",
-      status: question.status || "unknown",
+    status:
+  question.status === "published"
+    ? "public"
+    : question.status || "unknown",
       createdAt: question.createdAt,
     }));
 
