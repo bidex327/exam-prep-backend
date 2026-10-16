@@ -4,6 +4,7 @@ import { getAdminDashboard } from "../controllers/adminController.js";
 import {
   getAdminQuestions,
   getAdminQuestionById,
+   updateAdminQuestionStatus,
 } from "../controllers/adminQuestionController.js";
 import protect, { authorize } from "../middlewares/authMiddleware.js";
 
@@ -30,6 +31,13 @@ router.get(
   protect,
   authorize("admin"),
   getAdminQuestionById
+);
+
+router.patch(
+  "/questions/:id/status",
+  protect,
+  authorize("admin"),
+  updateAdminQuestionStatus
 );
 
 export default router;

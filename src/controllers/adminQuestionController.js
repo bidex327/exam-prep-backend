@@ -152,3 +152,60 @@ export const getAdminQuestionById = async (req, res) => {
     });
   }
 };
+
+
+ // PATCH /api/admin/questions/:id/status
+export const updateAdminQuestionStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid question ID",
+      });
+    }
+
+    if (!["draft", "published"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be draft or published",
+      });
+    }
+
+    const question = await Question.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    )
+      .populate("examId", "name code")
+      .populate("subjectId", "name")
+      .populate("topicId", "name")
+      .populate("createdBy", "fullName emailOrPhone")
+      .lean();
+
+    if (!question) {
+      return res.status(404).json({
+        success: false,
+        message: "Question not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message:
+        status === "published"
+          ? "Question published successfully"
+          : "Question unpublished successfully",
+      data: question,
+    });
+  } catch (error) {
+    console.error("UPDATE ADMIN QUESTION STATUS ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update question status",
+    });
+  }
+};
