@@ -207,7 +207,7 @@ export const resendVerification = async (req, res) => {
 
     await user.save();
 
-    const link = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
+    const link = `${process.env.CLIENT_URL}/students/authentication/verification.html?token=${verificationToken}`;
 
     await sendMail({
       to: user.emailOrPhone,

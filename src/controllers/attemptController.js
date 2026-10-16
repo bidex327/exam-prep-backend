@@ -557,12 +557,50 @@ export const submitAttempt = async (req, res) => {
         ),
       ];
 
+      const topicStats = new Map();
+
+for (const question of questions) {
+  const topicId = question.topicId.toString();
+
+  if (!topicStats.has(topicId)) {
+    topicStats.set(topicId, {
+      topicId: question.topicId,
+      numberOfQuestions: 0,
+      correctCount: 0,
+    });
+  }
+
+  const stats = topicStats.get(topicId);
+  stats.numberOfQuestions++;
+
+  const submittedAnswer = answers.find(
+    (answer) =>
+      answer.questionId.toString() === question._id.toString()
+  );
+
+  const selectedOption = submittedAnswer?.selectedOption ?? null;
+
+  const correctOption = question.options.find(
+    (option) => option.isCorrect === true
+  );
+
+  if (
+    selectedOption !== null &&
+    correctOption &&
+    correctOption.label === selectedOption
+  ) {
+    stats.correctCount++;
+  }
+}
+
+const topicBreakdown = Array.from(topicStats.values());
+
       practiceSession = await PracticeSession.create({
         user: req.user._id,
         subjectId: attempt.subjectId,
         topicId: questions[0]?.topicId ?? null,
         topicIds,
-        topicBreakdown: [],
+        topicBreakdown,
         mode: attempt.mode,
         numberOfQuestions: totalQuestions,
         correctAnswer: correctCount,
@@ -730,6 +768,130 @@ export const getAttemptById = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to retrieve attempt.",
+    });
+  }
+};
+
+
+export const saveAttemptAnswer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { questionId, selectedOption } = req.body;
+
+    if (
+      !mongoose.isValidObjectId(id) ||
+      !mongoose.isValidObjectId(questionId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid attempt ID or question ID.",
+      });
+    }
+
+    if (
+      selectedOption !== null &&
+      selectedOption !== undefined &&
+      (typeof selectedOption !== "string" || !selectedOption.trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "selectedOption must be a non-empty string or null.",
+      });
+    }
+
+    const attempt = await Attempt.findOne({
+      _id: id,
+      userId: req.user._id,
+      status: "in-progress",
+    });
+
+    if (!attempt) {
+      return res.status(404).json({
+        success: false,
+        message: "In-progress attempt not found.",
+      });
+    }
+
+    if (
+      attempt.durationMinutes &&
+      Date.now() >=
+        attempt.startedAt.getTime() +
+          attempt.durationMinutes * 60 * 1000
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Time has expired. Submit the attempt to finalize it.",
+      });
+    }
+
+    const assigned = attempt.questionIds.some(
+      (item) => item.toString() === questionId
+    );
+
+    if (!assigned) {
+      return res.status(400).json({
+        success: false,
+        message: "This question does not belong to the attempt.",
+      });
+    }
+
+    const question = await Question.findById(questionId).select(
+      "options topicId"
+    );
+
+    if (!question || !question.topicId) {
+      return res.status(400).json({
+        success: false,
+        message: "Question or its topic could not be found.",
+      });
+    }
+
+    const normalizedOption = selectedOption ?? null;
+
+    if (
+      normalizedOption !== null &&
+      !question.options.some((option) => option.label === normalizedOption)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid option for this question.",
+      });
+    }
+
+    const savedAnswer = await AttemptAnswer.findOneAndUpdate(
+      {
+        attemptId: attempt._id,
+        questionId,
+      },
+      {
+        $set: { selectedOption: normalizedOption },
+        $setOnInsert: {
+          topicId: question.topicId,
+          isCorrect: false,
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        runValidators: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Answer saved successfully.",
+      data: {
+        questionId: savedAnswer.questionId,
+        selectedOption: savedAnswer.selectedOption,
+      },
+    });
+  } catch (error) {
+    console.error("Save attempt answer error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save answer.",
     });
   }
 };

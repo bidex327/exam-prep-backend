@@ -89,6 +89,13 @@ const questionSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    status: {
+  type: String,
+  enum: ["draft", "published"],
+  default: "draft",
+  required: true,
+  index: true,
+},
   },
   { timestamps: true }
 );

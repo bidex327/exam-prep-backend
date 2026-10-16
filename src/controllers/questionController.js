@@ -62,13 +62,13 @@ const validateQuestionRelationships = async ({
 // GET ALL QUESTIONS
 // ======================================================
 
+
+
 export const getQuestions = async (req, res) => {
   try {
     const { examId, subjectId, topicId, year } = req.query;
-
     const filter = {};
 
-    // Validate examId
     if (examId) {
       if (!mongoose.isValidObjectId(examId)) {
         return res.status(400).json({
@@ -77,11 +77,9 @@ export const getQuestions = async (req, res) => {
           data: {},
         });
       }
-
       filter.examId = examId;
     }
 
-    // Validate subjectId
     if (subjectId) {
       if (!mongoose.isValidObjectId(subjectId)) {
         return res.status(400).json({
@@ -90,11 +88,9 @@ export const getQuestions = async (req, res) => {
           data: {},
         });
       }
-
       filter.subjectId = subjectId;
     }
 
-    // Validate topicId
     if (topicId) {
       if (!mongoose.isValidObjectId(topicId)) {
         return res.status(400).json({
@@ -103,18 +99,16 @@ export const getQuestions = async (req, res) => {
           data: {},
         });
       }
-
       filter.topicId = topicId;
     }
 
-    // Validate year
-    if (year) {
+    if (year !== undefined) {
       const numericYear = Number(year);
 
-      if (!Number.isInteger(numericYear)) {
+      if (!Number.isInteger(numericYear) || numericYear < 1) {
         return res.status(400).json({
           success: false,
-          message: "Year must be a valid number",
+          message: "Year must be a valid positive integer",
           data: {},
         });
       }
@@ -122,10 +116,15 @@ export const getQuestions = async (req, res) => {
       filter.year = numericYear;
     }
 
-    // Do NOT expose isCorrect to students
-    const questions = await Question.find(filter).select(
-      "-options.isCorrect"
-    );
+    // Students can only access published questions.
+    if (req.user.role === "student") {
+      filter.status = "published";
+    }
+
+    const questions = await Question.find(filter)
+      .select("-options.isCorrect")
+      .sort({ createdAt: -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
@@ -143,9 +142,12 @@ export const getQuestions = async (req, res) => {
   }
 };
 
+
+
 // ======================================================
 // GET ONE QUESTION BY ID
 // ======================================================
+
 
 export const getQuestionById = async (req, res) => {
   try {
@@ -159,10 +161,16 @@ export const getQuestionById = async (req, res) => {
       });
     }
 
-    // Do NOT expose isCorrect
-    const question = await Question.findById(id).select(
-      "-options.isCorrect"
-    );
+    // Restrict students to published questions only.
+    const filter = { _id: id };
+
+    if (req.user.role === "student") {
+      filter.status = "published";
+    }
+
+    const question = await Question.findOne(filter)
+      .select("-options.isCorrect")
+      .lean();
 
     if (!question) {
       return res.status(404).json({
@@ -187,6 +195,7 @@ export const getQuestionById = async (req, res) => {
     });
   }
 };
+
 
 // ======================================================
 // CREATE QUESTION

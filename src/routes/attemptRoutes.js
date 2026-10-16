@@ -3,6 +3,7 @@ import {
   startAttempt,
   submitAttempt,
   getAttemptById,
+    saveAttemptAnswer,
 } from "../controllers/attemptController.js";
 import protect from "../middlewares/authMiddleware.js";
 
@@ -33,6 +34,8 @@ const router = express.Router();
  *         description: Authentication required
  */
 router.post("/", protect, startAttempt);
+
+router.put("/:id/answers", protect, saveAttemptAnswer);
 
 /**
  * @swagger
