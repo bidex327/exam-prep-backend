@@ -217,20 +217,19 @@ export const createQuestion = async (req, res) => {
 
     // Validate required fields
     if (
-      !examId ||
-      !subjectId ||
-      !topicId ||
-      year === undefined ||
-      !questionText ||
-      !options
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "examId, subjectId, topicId, year, questionText, and options are required",
-        data: {},
-      });
-    }
+  !examId ||
+  !subjectId ||
+  !topicId ||
+  !questionText ||
+  !options
+) {
+  return res.status(400).json({
+    success: false,
+    message:
+      "examId, subjectId, topicId, questionText, and options are required",
+    data: {},
+  });
+}
 
     // Validate MongoDB IDs
     if (
@@ -264,15 +263,19 @@ export const createQuestion = async (req, res) => {
     }
 
     // Validate year
-    const numericYear = Number(year);
+   let numericYear;
 
-    if (!Number.isInteger(numericYear) || numericYear < 1) {
-      return res.status(400).json({
-        success: false,
-        message: "Year must be a valid positive integer",
-        data: {},
-      });
-    }
+if (year !== undefined && year !== null && year !== "") {
+  numericYear = Number(year);
+
+  if (!Number.isInteger(numericYear) || numericYear < 1) {
+    return res.status(400).json({
+      success: false,
+      message: "Year must be a valid positive integer",
+      data: {},
+    });
+  }
+}
 
     // Validate options
     if (!Array.isArray(options) || options.length < 2 || options.length > 4) {
@@ -333,7 +336,7 @@ export const createQuestion = async (req, res) => {
       subjectId,
       topicId,
       createdBy: req.user._id,
-      year: numericYear,
+     ...(numericYear !== undefined ? { year: numericYear } : {}),
       questionType,
       questionText: questionText.trim(),
       options,
