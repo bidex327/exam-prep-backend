@@ -665,27 +665,93 @@ export const getAttemptById = async (req, res) => {
       .populate("examId")
       .populate("subjectId");
 
-    if (!attempt) {
-      return res.status(404).json({
-        success: false,
-        message: "Attempt not found.",
-      });
-    }
+    const isInProgress = attempt.status === "in-progress";
 
-    if (
-      !["completed", "auto-submitted", "submitted"].includes(
-        attempt.status
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "This attempt has not been submitted yet.",
-      });
-    }
+if (
+  !isInProgress &&
+  !["completed", "auto-submitted", "submitted"].includes(
+    attempt.status
+  )
+) {
+  return res.status(400).json({
+    success: false,
+    message: "This attempt has an unsupported status.",
+  });
+}
 
     const savedAnswers = await AttemptAnswer.find({
       attemptId: attempt._id,
     });
+    if (isInProgress) {
+  const savedAnswers = await AttemptAnswer.find({
+    attemptId: attempt._id,
+  }).select("questionId selectedOption");
+
+  const questions = await Question.find({
+    _id: { $in: attempt.questionIds },
+  }).select("questionText options.label options.text topicId year");
+
+  const resumableQuestions = attempt.questionIds.map((questionId) => {
+    const question = questions.find(
+      (item) => item._id.toString() === questionId.toString()
+    );
+
+    const savedAnswer = savedAnswers.find(
+      (answer) =>
+        answer.questionId.toString() === questionId.toString()
+    );
+
+    if (!question) {
+      return {
+        questionId,
+        questionText: null,
+        options: [],
+        selectedOption: savedAnswer?.selectedOption ?? null,
+        topicId: null,
+        year: null,
+      };
+    }
+
+    return {
+      questionId: question._id,
+      questionText: question.questionText,
+      options: question.options.map((option) => ({
+        label: option.label,
+        text: option.text,
+      })),
+      selectedOption: savedAnswer?.selectedOption ?? null,
+      topicId: question.topicId ?? null,
+      year: question.year ?? null,
+    };
+  });
+
+  const deadline =
+    attempt.durationMinutes != null && attempt.startedAt
+      ? new Date(
+          attempt.startedAt.getTime() +
+            attempt.durationMinutes * 60 * 1000
+        )
+      : null;
+
+  return res.status(200).json({
+    success: true,
+    message: "In-progress attempt retrieved successfully.",
+    data: {
+      attemptId: attempt._id,
+      exam: attempt.examId,
+      subject: attempt.subjectId,
+      mode: attempt.mode,
+      status: attempt.status,
+      totalQuestions: attempt.totalQuestions,
+      durationMinutes: attempt.durationMinutes,
+      durationSeconds: attempt.durationSeconds,
+      startedAt: attempt.startedAt,
+      deadline,
+      isExpired: deadline !== null && new Date() >= deadline,
+      questions: resumableQuestions,
+    },
+  });
+}
 
     const questions = await Question.find({
       _id: {

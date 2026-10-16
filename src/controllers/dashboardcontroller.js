@@ -611,7 +611,6 @@ export const getDashboard = async (req, res) => {
     // Recent activity: completed practice sessions only
     const recentActivities = practiceSessions
       .filter((session) => session.status === "completed")
-      .slice(0, 5)
       .map((session) => ({
         icon: session.subjectId?.icon || "book-open",
         subject:
