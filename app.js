@@ -48,6 +48,7 @@ const allowedOrigins = [
   "https://snack.expo.dev",
   "http://localhost:8081",
   "http://localhost:8082",
+  "https://exam-app--czcmxkpoa6.expo.app"
 ].filter(Boolean);
 export const corsOptions = {
   origin(origin, callback) {
